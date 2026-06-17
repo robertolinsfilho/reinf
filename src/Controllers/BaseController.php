@@ -28,24 +28,28 @@ abstract class BaseController
             throw new \RuntimeException("View não encontrada: {$template}");
         }
 
-        // Buffer do conteúdo
         ob_start();
         include $viewPath;
         $content = ob_get_clean();
 
-        // Views standalone (login, erros) incluem seu próprio HTML
         if (!empty($GLOBALS['_no_layout'])) {
             echo $content;
             return;
         }
 
-        // Layout
         $layout = BASE_PATH . '/src/Views/layouts/main.php';
         include $layout;
     }
 
-    protected function redirect(string $url): void
+    /**
+     * Redireciona. Aceita mensagem flash opcional.
+     * Compatível com: redirect('/url') e redirect('/url', 'msg', 'tipo')
+     */
+    protected function redirect(string $url, ?string $mensagem = null, string $tipo = 'info'): void
     {
+        if ($mensagem !== null) {
+            $this->flash($tipo, $mensagem);
+        }
         header("Location: {$url}");
         exit;
     }
@@ -68,6 +72,12 @@ abstract class BaseController
         if (!$this->isLoggedIn()) {
             $this->redirect('/login');
         }
+    }
+
+    /** Alias para requireLogin — compatibilidade com novos controllers */
+    protected function requireAuth(): void
+    {
+        $this->requireLogin();
     }
 
     protected function requireAdmin(): void
