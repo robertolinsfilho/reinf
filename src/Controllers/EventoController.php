@@ -166,4 +166,126 @@ class EventoController extends BaseController
         $this->flash('sucesso', 'Registro R-2060 salvo com sucesso!');
         $this->redirect("/eventos/r2060?competencia_id={$cid}");
     }
+
+    // ─── R-4010 · Pagamentos PF ─────────────────────────────
+
+    public function r4010(): void
+    {
+        $this->requireAuth();
+        $competenciaId = (int) ($_GET['competencia_id'] ?? 0);
+        $db = Database::getInstance();
+
+        $stmt = $db->prepare("SELECT * FROM r4010 WHERE competencia_id = ? ORDER BY data_pagamento DESC");
+        $stmt->execute([$competenciaId]);
+        $registros = $stmt->fetchAll();
+
+        $comp = $db->prepare("SELECT c.*, ct.cnpj, ct.razao_social FROM competencias c JOIN contribuintes ct ON ct.id = c.contribuinte_id WHERE c.id = ?");
+        $comp->execute([$competenciaId]);
+
+        $this->view('pages/eventos/r4010', [
+            'registros'    => $registros,
+            'competencia'  => $comp->fetch(),
+        ]);
+    }
+
+    public function salvarR4010(): void
+    {
+        $this->requireAuth();
+        $db = Database::getInstance();
+        $d  = $_POST;
+
+        $stmt = $db->prepare("
+            INSERT INTO r4010
+                (competencia_id, cpf_beneficiario, nome_beneficiario, natureza_rendimento, data_pagamento, valor_bruto, valor_ir, valor_base_ir, valor_deducao, descricao_pagamento)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ");
+        $stmt->execute([
+            $d['competencia_id'],
+            preg_replace('/\D/', '', $d['cpf_beneficiario']),
+            $d['nome_beneficiario'] ?? '',
+            $d['natureza_rendimento'] ?? '',
+            $d['data_pagamento'],
+            $this->parseMoney($d['valor_bruto'] ?? '0'),
+            $this->parseMoney($d['valor_ir'] ?? '0'),
+            $this->parseMoney($d['valor_base_ir'] ?? '0'),
+            $this->parseMoney($d['valor_deducao'] ?? '0'),
+            $d['descricao_pagamento'] ?? '',
+        ]);
+
+        $this->redirect("/eventos/r4010?competencia_id={$d['competencia_id']}", 'Pagamento PF adicionado!', 'success');
+    }
+
+    public function excluirR4010(): void
+    {
+        $this->requireAuth();
+        $id   = (int) ($_POST['id'] ?? 0);
+        $comp = (int) ($_POST['competencia_id'] ?? 0);
+        Database::getInstance()->prepare("DELETE FROM r4010 WHERE id = ?")->execute([$id]);
+        $this->redirect("/eventos/r4010?competencia_id={$comp}", 'Registro excluído.', 'success');
+    }
+
+    // ─── R-4020 · Pagamentos PJ ─────────────────────────────
+
+    public function r4020(): void
+    {
+        $this->requireAuth();
+        $competenciaId = (int) ($_GET['competencia_id'] ?? 0);
+        $db = Database::getInstance();
+
+        $stmt = $db->prepare("SELECT * FROM r4020 WHERE competencia_id = ? ORDER BY data_pagamento DESC");
+        $stmt->execute([$competenciaId]);
+        $registros = $stmt->fetchAll();
+
+        $comp = $db->prepare("SELECT c.*, ct.cnpj, ct.razao_social FROM competencias c JOIN contribuintes ct ON ct.id = c.contribuinte_id WHERE c.id = ?");
+        $comp->execute([$competenciaId]);
+
+        $this->view('pages/eventos/r4020', [
+            'registros'   => $registros,
+            'competencia' => $comp->fetch(),
+        ]);
+    }
+
+    public function salvarR4020(): void
+    {
+        $this->requireAuth();
+        $db = Database::getInstance();
+        $d  = $_POST;
+
+        $stmt = $db->prepare("
+            INSERT INTO r4020
+                (competencia_id, cnpj_beneficiario, razao_social_beneficiario, natureza_rendimento, data_pagamento, valor_bruto, valor_ir, valor_csll, valor_cofins, valor_pis, valor_base_ir)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ");
+        $stmt->execute([
+            $d['competencia_id'],
+            preg_replace('/\D/', '', $d['cnpj_beneficiario']),
+            $d['razao_social_beneficiario'] ?? '',
+            $d['natureza_rendimento'] ?? '',
+            $d['data_pagamento'],
+            $this->parseMoney($d['valor_bruto'] ?? '0'),
+            $this->parseMoney($d['valor_ir'] ?? '0'),
+            $this->parseMoney($d['valor_csll'] ?? '0'),
+            $this->parseMoney($d['valor_cofins'] ?? '0'),
+            $this->parseMoney($d['valor_pis'] ?? '0'),
+            $this->parseMoney($d['valor_base_ir'] ?? '0'),
+        ]);
+
+        $this->redirect("/eventos/r4020?competencia_id={$d['competencia_id']}", 'Pagamento PJ adicionado!', 'success');
+    }
+
+    public function excluirR4020(): void
+    {
+        $this->requireAuth();
+        $id   = (int) ($_POST['id'] ?? 0);
+        $comp = (int) ($_POST['competencia_id'] ?? 0);
+        Database::getInstance()->prepare("DELETE FROM r4020 WHERE id = ?")->execute([$id]);
+        $this->redirect("/eventos/r4020?competencia_id={$comp}", 'Registro excluído.', 'success');
+    }
+
+    // ─── Helper ──────────────────────────────────────────────
+
+    private function parseMoney(string $valor): float
+    {
+        return (float) str_replace(['.', ','], ['', '.'], $valor);
+    }
 }

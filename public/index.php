@@ -43,6 +43,9 @@ $routes = [
         '/eventos/r2010'         => ['App\\Controllers\\EventoController', 'r2010'],
         '/eventos/r2020'         => ['App\\Controllers\\EventoController', 'r2020'],
         '/eventos/r2060'         => ['App\\Controllers\\EventoController', 'r2060'],
+        '/eventos/r4020'         => ['App\\Controllers\\EventoController', 'r4020'],        // NOVO
+        '/eventos/r4020/excluir' => ['App\\Controllers\\EventoController', 'excluirR4020'], // NOVO
+        '/eventos/natureza'      => ['App\\Controllers\\EventoController', 'naturezaJson'], // NOVO (API)
         '/importar'              => ['App\\Controllers\\ImportacaoController', 'index'],
         '/gerar'                 => ['App\\Controllers\\GeracaoController', 'index'],
         '/download'              => ['App\\Controllers\\GeracaoController', 'download'],
@@ -57,6 +60,7 @@ $routes = [
         '/eventos/r2010/salvar'  => ['App\\Controllers\\EventoController', 'salvarR2010'],
         '/eventos/r2020/salvar'  => ['App\\Controllers\\EventoController', 'salvarR2020'],
         '/eventos/r2060/salvar'  => ['App\\Controllers\\EventoController', 'salvarR2060'],
+        '/eventos/r4020/salvar'  => ['App\\Controllers\\EventoController', 'salvarR4020'], // NOVO
         '/importar/processar'    => ['App\\Controllers\\ImportacaoController', 'processar'],
         '/gerar/xml'             => ['App\\Controllers\\GeracaoController', 'gerarXml'],
         '/usuarios/salvar'       => ['App\\Controllers\\UsuarioController', 'salvar'],
@@ -73,6 +77,24 @@ if ($handler) {
     $controller->$action();
 } else {
     // 404
+    // R-4010 (Pagamentos PF)
+    '/eventos/r4010'               => ['EventoController', 'r4010'],
+    '/eventos/r4010/salvar'        => ['EventoController', 'salvarR4010'],
+    '/eventos/r4010/excluir'       => ['EventoController', 'excluirR4010'],
+
+    // R-4020 (Pagamentos PJ)
+    '/eventos/r4020'               => ['EventoController', 'r4020'],
+    '/eventos/r4020/salvar'        => ['EventoController', 'salvarR4020'],
+    '/eventos/r4020/excluir'       => ['EventoController', 'excluirR4020'],
+
+    // Transmissão
+    '/transmissao'                 => ['TransmissaoController', 'index'],
+    '/transmissao/enviar'          => ['TransmissaoController', 'enviar'],
+    '/transmissao/consultar'       => ['TransmissaoController', 'consultar'],
+
+    // Certificados
+    '/certificados'                => ['CertificadoController', 'index'],
+    '/certificados/upload'         => ['CertificadoController', 'upload'],
     http_response_code(404);
     include BASE_PATH . '/src/Views/errors/404.php';
 }

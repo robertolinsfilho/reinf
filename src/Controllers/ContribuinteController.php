@@ -2,6 +2,8 @@
 
 namespace App\Controllers;
 
+use App\Services\ValidacaoService;
+
 class ContribuinteController extends BaseController
 {
     public function index(): void
@@ -59,11 +61,11 @@ class ContribuinteController extends BaseController
         $id  = (int) $this->post('id', 0);
 
         $dados = [
-            'cnpj'                  => preg_replace('/\D/', '', $this->post('cnpj', '')),
-            'razao_social'          => $this->sanitize($this->post('razao_social', '')),
-            'nome_fantasia'         => $this->sanitize($this->post('nome_fantasia', '')),
-            'tipo_contribuinte'     => $this->post('tipo_contribuinte', '1'),
-            'classificacao_tributos'=> $this->sanitize($this->post('classificacao_tributos', '')),
+            'cnpj'                   => preg_replace('/\D/', '', $this->post('cnpj', '')),
+            'razao_social'           => $this->sanitize($this->post('razao_social', '')),
+            'nome_fantasia'          => $this->sanitize($this->post('nome_fantasia', '')),
+            'tipo_contribuinte'      => $this->post('tipo_contribuinte', '1'),
+            'classificacao_tributos' => $this->sanitize($this->post('classificacao_tributos', '')),
         ];
 
         if (empty($dados['cnpj']) || empty($dados['razao_social'])) {
@@ -71,19 +73,28 @@ class ContribuinteController extends BaseController
             $this->redirect($id ? "/contribuintes/editar?id={$id}" : '/contribuintes/novo');
         }
 
+        // Valida dígito verificador apenas para CNPJ e CPF (pula CAEPF, CNO, CEI)
+        if (in_array($dados['tipo_contribuinte'], ['1', '2'])) {
+            if (!ValidacaoService::cnpjOuCpf($dados['cnpj'])) {
+                $this->flash('erro', 'CNPJ/CPF inválido. Verifique os dígitos verificadores.');
+                $this->redirect($id ? "/contribuintes/editar?id={$id}" : '/contribuintes/novo');
+            }
+        }
+
         if ($id) {
             $stmt = $this->db->prepare("
-                UPDATE contribuintes SET cnpj=?, razao_social=?, nome_fantasia=?, tipo_contribuinte=?, classificacao_tributos=?
+                UPDATE contribuintes
+                SET cnpj=?, razao_social=?, nome_fantasia=?, tipo_contribuinte=?, classificacao_tributos=?
                 WHERE id=? AND usuario_id=?
             ");
-            $stmt->execute([...(array_values($dados)), $id, $uid]);
+            $stmt->execute([...array_values($dados), $id, $uid]);
             $this->flash('sucesso', 'Contribuinte atualizado com sucesso.');
         } else {
             $stmt = $this->db->prepare("
                 INSERT INTO contribuintes (usuario_id, cnpj, razao_social, nome_fantasia, tipo_contribuinte, classificacao_tributos)
                 VALUES (?, ?, ?, ?, ?, ?)
             ");
-            $stmt->execute([$uid, ...(array_values($dados))]);
+            $stmt->execute([$uid, ...array_values($dados)]);
             $this->flash('sucesso', 'Contribuinte cadastrado com sucesso.');
         }
 

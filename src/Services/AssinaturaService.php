@@ -1,0 +1,178 @@
+<?php
+
+namespace App\Services;
+
+/**
+ * Assina XML EFD-Reinf com certificado digital A1 (PFX/P12).
+ * Usa XMLDSig (enveloped signature) conforme manual do desenvolvedor.
+ */
+class AssinaturaService
+{
+    private string $certPath;
+    private string $certPass;
+
+    public function __construct()
+    {
+        $config = require BASE_PATH . '/config/app.php';
+        $this->certPath = $config['reinf']['cert_path'] ?? '';
+        $this->certPass = $config['reinf']['cert_pass'] ?? '';
+    }
+
+    /**
+     * Assina o XML e retorna o XML assinado.
+     * @throws \RuntimeException se certificado não encontrado ou inválido
+     */
+    public function assinar(string $xml, ?string $pfxPath = null, ?string $pfxPass = null): string
+    {
+        $pfxPath = $pfxPath ?: $this->findCertificado();
+        $pfxPass = $pfxPass ?: $this->certPass;
+
+        if (!$pfxPath || !file_exists($pfxPath)) {
+            throw new \RuntimeException("Certificado digital não encontrado em: {$pfxPath}");
+        }
+
+        $pfxContent = file_get_contents($pfxPath);
+        $certs = [];
+
+        if (!openssl_pkcs12_read($pfxContent, $certs, $pfxPass)) {
+            throw new \RuntimeException("Falha ao ler o certificado PFX. Verifique a senha.");
+        }
+
+        $privateKey = $certs['pkey'];
+        $publicCert = $certs['cert'];
+
+        // Extrair dados do certificado
+        $certData = openssl_x509_parse($publicCert);
+        $validTo  = $certData['validTo_time_t'] ?? 0;
+
+        if ($validTo < time()) {
+            throw new \RuntimeException("Certificado digital expirado em " . date('d/m/Y', $validTo));
+        }
+
+        return $this->xmlDsig($xml, $privateKey, $publicCert);
+    }
+
+    /**
+     * Verifica dados do certificado (para exibição).
+     */
+    public function infoCertificado(?string $pfxPath = null, ?string $pfxPass = null): array
+    {
+        $pfxPath = $pfxPath ?: $this->findCertificado();
+        $pfxPass = $pfxPass ?: $this->certPass;
+
+        if (!$pfxPath || !file_exists($pfxPath)) {
+            return ['valido' => false, 'erro' => 'Certificado não encontrado'];
+        }
+
+        $pfxContent = file_get_contents($pfxPath);
+        $certs = [];
+
+        if (!openssl_pkcs12_read($pfxContent, $certs, $pfxPass)) {
+            return ['valido' => false, 'erro' => 'Senha inválida'];
+        }
+
+        $data = openssl_x509_parse($certs['cert']);
+        $cn   = $data['subject']['CN'] ?? '—';
+        $validFrom = $data['validFrom_time_t'] ?? 0;
+        $validTo   = $data['validTo_time_t'] ?? 0;
+
+        // Extrair CNPJ do certificado (está no campo OU ou na extensão)
+        $cnpj = '';
+        if (preg_match('/\d{14}/', $data['subject']['OU'] ?? '', $m)) {
+            $cnpj = $m[0];
+        }
+
+        return [
+            'valido'     => $validTo > time(),
+            'titular'    => $cn,
+            'cnpj'       => $cnpj,
+            'emissao'    => date('d/m/Y', $validFrom),
+            'validade'   => date('d/m/Y', $validTo),
+            'expirado'   => $validTo < time(),
+            'dias_rest'  => max(0, (int) ceil(($validTo - time()) / 86400)),
+        ];
+    }
+
+    private function findCertificado(): ?string
+    {
+        if (!is_dir($this->certPath)) {
+            return null;
+        }
+        $files = glob($this->certPath . '*.{pfx,p12}', GLOB_BRACE);
+        return $files[0] ?? null;
+    }
+
+    /**
+     * Aplica assinatura XMLDSig (enveloped) ao XML.
+     */
+    private function xmlDsig(string $xml, $privateKey, $publicCert): string
+    {
+        $dom = new \DOMDocument('1.0', 'UTF-8');
+        $dom->preserveWhiteSpace = false;
+        $dom->formatOutput = false;
+        $dom->loadXML($xml);
+
+        // Encontrar o elemento que tem atributo "id" (o evento)
+        $xpath = new \DOMXPath($dom);
+        $nodes = $xpath->query('//*[@id]');
+
+        if ($nodes->length === 0) {
+            throw new \RuntimeException("XML não contém elemento com atributo 'id' para assinar.");
+        }
+
+        $nodeToSign = $nodes->item(0);
+        $refUri     = '#' . $nodeToSign->getAttribute('id');
+
+        // Canonicalizar o nó
+        $canonical = $nodeToSign->C14N(false, false);
+
+        // Digest (SHA-256)
+        $digestValue = base64_encode(hash('sha256', $canonical, true));
+
+        // Montar SignedInfo
+        $signedInfo  = '<SignedInfo xmlns="http://www.w3.org/2000/09/xmldsig#">';
+        $signedInfo .= '<CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"/>';
+        $signedInfo .= '<SignatureMethod Algorithm="http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"/>';
+        $signedInfo .= '<Reference URI="' . $refUri . '">';
+        $signedInfo .= '<Transforms>';
+        $signedInfo .= '<Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"/>';
+        $signedInfo .= '<Transform Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"/>';
+        $signedInfo .= '</Transforms>';
+        $signedInfo .= '<DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/>';
+        $signedInfo .= '<DigestValue>' . $digestValue . '</DigestValue>';
+        $signedInfo .= '</Reference>';
+        $signedInfo .= '</SignedInfo>';
+
+        // Canonicalizar SignedInfo e assinar
+        $siDom = new \DOMDocument();
+        $siDom->loadXML($signedInfo);
+        $siCanonical = $siDom->documentElement->C14N(false, false);
+
+        $signature = '';
+        if (!openssl_sign($siCanonical, $signature, $privateKey, OPENSSL_ALGO_SHA256)) {
+            throw new \RuntimeException("Falha ao assinar XML: " . openssl_error_string());
+        }
+        $signatureValue = base64_encode($signature);
+
+        // Extrair certificado X509 (sem header/footer)
+        $x509 = preg_replace('/(-----BEGIN CERTIFICATE-----|-----END CERTIFICATE-----|\s)/', '', $publicCert);
+
+        // Montar Signature
+        $signatureXml  = '<Signature xmlns="http://www.w3.org/2000/09/xmldsig#">';
+        $signatureXml .= $signedInfo;
+        $signatureXml .= '<SignatureValue>' . $signatureValue . '</SignatureValue>';
+        $signatureXml .= '<KeyInfo>';
+        $signatureXml .= '<X509Data>';
+        $signatureXml .= '<X509Certificate>' . $x509 . '</X509Certificate>';
+        $signatureXml .= '</X509Data>';
+        $signatureXml .= '</KeyInfo>';
+        $signatureXml .= '</Signature>';
+
+        // Inserir Signature no nó assinado
+        $sigFrag = $dom->createDocumentFragment();
+        $sigFrag->appendXML($signatureXml);
+        $nodeToSign->appendChild($sigFrag);
+
+        return $dom->saveXML();
+    }
+}

@@ -1,12 +1,14 @@
 {
-    "name": "efd/reinf",
-    "description": "Sistema EFD REINF Web",
+    "name": "reinf/efd-reinf-web",
+    "description": "Sistema EFD-Reinf Web - PHP + Docker",
     "type": "project",
     "require": {
         "php": "^8.2",
-        "phpoffice/phpspreadsheet": "^2.0",
-        "vlucas/phpdotenv": "^5.6",
-        "phpmailer/phpmailer": "^6.9"
+        "ext-openssl": "*",
+        "ext-dom": "*",
+        "ext-curl": "*",
+        "ext-simplexml": "*",
+        "phpoffice/phpspreadsheet": "^1.29"
     },
     "autoload": {
         "psr-4": {
@@ -14,6 +16,7 @@
         }
     },
     "config": {
-        "optimize-autoloader": true
+        "optimize-autoloader": true,
+        "sort-packages": true
     }
 }
