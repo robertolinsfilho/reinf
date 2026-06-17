@@ -1,0 +1,7 @@
+/vendor/
+/.env
+/public/uploads/xml/
+/public/uploads/*.xlsx
+/public/uploads/*.xls
+*.log
+.DS_Store
