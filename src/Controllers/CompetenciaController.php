@@ -93,16 +93,26 @@ class CompetenciaController extends BaseController
         $stmt->execute([$id]);
         $r2060 = $stmt->fetchAll();
 
+        $stmt = $this->db->prepare("SELECT * FROM r4010 WHERE competencia_id = ?");
+        $stmt->execute([$id]);
+        $r4010 = $stmt->fetchAll();
+
+        $stmt = $this->db->prepare("SELECT * FROM r4020 WHERE competencia_id = ?");
+        $stmt->execute([$id]);
+        $r4020 = $stmt->fetchAll();
+
         $this->view('pages/competencias/detalhe', [
-            'pageTitle'  => 'Detalhe da Competência',
-            'competencia'=> $competencia,
-            'r2010'      => $r2010,
-            'r2020'      => $r2020,
-            'r2060'      => $r2060,
-            'flash'      => $this->getFlash(),
+            'pageTitle'   => 'Detalhe da Competência',
+            'competencia' => $competencia,
+            'r2010'       => $r2010,
+            'r2020'       => $r2020,
+            'r2060'       => $r2060,
+            'r4010'       => $r4010,
+            'r4020'       => $r4020,
+            'flash'       => $this->getFlash(),
         ]);
     }
-
+    
     public function salvar(): void
     {
         $this->requireLogin();

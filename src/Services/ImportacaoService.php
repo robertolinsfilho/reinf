@@ -14,182 +14,178 @@ class ImportacaoService
         $sheet       = $spreadsheet->getActiveSheet();
         $rows        = $sheet->toArray(null, true, true, true);
 
-        if (count($rows) < 2) {
-            throw new \RuntimeException('Planilha vazia ou sem dados após o cabeçalho.');
-        }
-
         // Remover cabeçalho
-        array_shift($rows);
+        $header = array_shift($rows);
 
-        $total      = count($rows);
         $importados = 0;
         $erros      = [];
 
-        foreach ($rows as $rowNum => $row) {
-            // Pular linhas completamente vazias
-            if (empty(array_filter($row))) continue;
-
+        foreach ($rows as $i => $row) {
+            $linha = $i + 2; // +2 porque removemos header e arrays começam em 1
             try {
+                // Pular linhas vazias
+                $valores = array_filter($row, fn($v) => $v !== null && $v !== '');
+                if (empty($valores)) continue;
+
                 match ($evento) {
                     'R2010' => $this->importarR2010($row, $competenciaId),
                     'R2020' => $this->importarR2020($row, $competenciaId),
-                    'R2050' => $this->importarR2050($row, $competenciaId),
-                    'R2055' => $this->importarR2055($row, $competenciaId),
                     'R2060' => $this->importarR2060($row, $competenciaId),
+                    'R4010' => $this->importarR4010($row, $competenciaId),
+                    'R4020' => $this->importarR4020($row, $competenciaId),
                     default => throw new \RuntimeException("Evento {$evento} não suportado para importação."),
                 };
                 $importados++;
-            } catch (\Exception $e) {
-                $erros[] = "Linha {$rowNum}: " . $e->getMessage();
+            } catch (\Throwable $e) {
+                $erros[] = "Linha {$linha}: " . $e->getMessage();
             }
         }
 
-        if (!empty($erros) && $importados === 0) {
-            throw new \RuntimeException(implode("\n", array_slice($erros, 0, 5)));
-        }
-
-        return ['total' => $total, 'importados' => $importados, 'erros' => $erros];
+        return [
+            'total'      => count($rows),
+            'importados' => $importados,
+            'erros'      => $erros,
+        ];
     }
 
-    /**
-     * Colunas esperadas R-2010:
-     * A=CNPJ Prestador, B=Razão Social, C=Nº Documento, D=Data Emissão,
-     * E=Valor Bruto, F=Valor Retenção, G=Valor SENAR
-     */
+    // ─── R-2010 ──────────────────────────────────────────────
+
     private function importarR2010(array $row, int $competenciaId): void
     {
-        $cnpj    = preg_replace('/\D/', '', (string)($row['A'] ?? ''));
-        $razao   = trim((string)($row['B'] ?? ''));
-        $numDoc  = trim((string)($row['C'] ?? ''));
-        $dtEmis  = $this->parseData($row['D'] ?? null);
-        $bruto   = $this->parseMoeda($row['E'] ?? 0);
-        $retenc  = $this->parseMoeda($row['F'] ?? 0);
-        $senar   = $this->parseMoeda($row['G'] ?? 0);
-
-        if (empty($cnpj)) throw new \RuntimeException("CNPJ Prestador vazio.");
-        if ($bruto <= 0)  throw new \RuntimeException("Valor Bruto inválido.");
-
-        $tipo = strlen($cnpj) === 14 ? '1' : '2';
-
+        // Colunas esperadas: A=CNPJ, B=Razão Social, C=Tipo Insc, D=Nº Doc, E=Data, F=Bruto, G=Retenção, H=SENAR
         $stmt = $this->db->prepare("
             INSERT INTO r2010 (competencia_id, cnpj_prestador, razao_social_prestador, tipo_insc_prestador,
             num_documento, data_emissao, valor_bruto, valor_retencao, valor_desc_senar)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
-        $stmt->execute([$competenciaId, $cnpj, $razao, $tipo, $numDoc, $dtEmis, $bruto, $retenc, $senar]);
+        $stmt->execute([
+            $competenciaId,
+            preg_replace('/\D/', '', $row['A'] ?? ''),
+            $row['B'] ?? '',
+            $row['C'] ?? '1',
+            $row['D'] ?? '',
+            $this->parseData($row['E'] ?? null),
+            $this->parseMoeda($row['F'] ?? 0),
+            $this->parseMoeda($row['G'] ?? 0),
+            $this->parseMoeda($row['H'] ?? 0),
+        ]);
     }
 
-    /**
-     * Colunas esperadas R-2020:
-     * A=CNPJ Tomador, B=Razão Social, C=Nº Documento, D=Data Emissão,
-     * E=Valor Bruto, F=Valor Retenção
-     */
+    // ─── R-2020 ──────────────────────────────────────────────
+
     private function importarR2020(array $row, int $competenciaId): void
     {
-        $cnpj   = preg_replace('/\D/', '', (string)($row['A'] ?? ''));
-        $razao  = trim((string)($row['B'] ?? ''));
-        $numDoc = trim((string)($row['C'] ?? ''));
-        $dtEmis = $this->parseData($row['D'] ?? null);
-        $bruto  = $this->parseMoeda($row['E'] ?? 0);
-        $retenc = $this->parseMoeda($row['F'] ?? 0);
-
-        if (empty($cnpj)) throw new \RuntimeException("CNPJ Tomador vazio.");
-
-        $tipo = strlen($cnpj) === 14 ? '1' : '2';
-
+        // Colunas: A=CNPJ Tomador, B=Razão Social, C=Tipo Insc, D=Nº Doc, E=Data, F=Bruto, G=Retenção
         $stmt = $this->db->prepare("
             INSERT INTO r2020 (competencia_id, cnpj_tomador, razao_social_tomador, tipo_insc_tomador,
             num_documento, data_emissao, valor_bruto, valor_retencao)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         ");
-        $stmt->execute([$competenciaId, $cnpj, $razao, $tipo, $numDoc, $dtEmis, $bruto, $retenc]);
+        $stmt->execute([
+            $competenciaId,
+            preg_replace('/\D/', '', $row['A'] ?? ''),
+            $row['B'] ?? '',
+            $row['C'] ?? '1',
+            $row['D'] ?? '',
+            $this->parseData($row['E'] ?? null),
+            $this->parseMoeda($row['F'] ?? 0),
+            $this->parseMoeda($row['G'] ?? 0),
+        ]);
     }
 
-    /**
-     * Colunas esperadas R-2050:
-     * A=CNPJ Adquirente, B=Nome, C=Valor Comercialização, D=Contribuição, E=SENAR, F=Data
-     */
-    private function importarR2050(array $row, int $competenciaId): void
-    {
-        $cnpj   = preg_replace('/\D/', '', (string)($row['A'] ?? ''));
-        $nome   = trim((string)($row['B'] ?? ''));
-        $valor  = $this->parseMoeda($row['C'] ?? 0);
-        $contrib= $this->parseMoeda($row['D'] ?? 0);
-        $senar  = $this->parseMoeda($row['E'] ?? 0);
-        $data   = $this->parseData($row['F'] ?? null);
+    // ─── R-2060 ──────────────────────────────────────────────
 
-        $stmt = $this->db->prepare("
-            INSERT INTO r2050 (competencia_id, cnpj_adquirente, razao_social,
-            valor_comercializacao, valor_contribuicao_previdenciaria, valor_senar, data_operacao)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        ");
-        $stmt->execute([$competenciaId, $cnpj, $nome, $valor, $contrib, $senar, $data]);
-    }
-
-    /**
-     * Colunas esperadas R-2055:
-     * A=CPF Produtor, B=Nome, C=Valor Aquisição, D=Retenção, E=SENAR, F=Data
-     */
-    private function importarR2055(array $row, int $competenciaId): void
-    {
-        $cpf   = preg_replace('/\D/', '', (string)($row['A'] ?? ''));
-        $nome  = trim((string)($row['B'] ?? ''));
-        $valor = $this->parseMoeda($row['C'] ?? 0);
-        $ret   = $this->parseMoeda($row['D'] ?? 0);
-        $senar = $this->parseMoeda($row['E'] ?? 0);
-        $data  = $this->parseData($row['F'] ?? null);
-
-        $stmt = $this->db->prepare("
-            INSERT INTO r2055 (competencia_id, cpf_produtor, nome_produtor,
-            valor_aquisicao, valor_retencao, valor_senar, data_aquisicao)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        ");
-        $stmt->execute([$competenciaId, $cpf, $nome, $valor, $ret, $senar, $data]);
-    }
-
-    /**
-     * Colunas esperadas R-2060:
-     * A=CNAE, B=Rec Bruta, C=Exclusões, D=Alíquota
-     */
     private function importarR2060(array $row, int $competenciaId): void
     {
-        $cnae   = trim((string)($row['A'] ?? ''));
-        $bruta  = $this->parseMoeda($row['B'] ?? 0);
-        $excl   = $this->parseMoeda($row['C'] ?? 0);
-        $aliq   = (float) str_replace(',', '.', (string)($row['D'] ?? 0));
-        $base   = $bruta - $excl;
-        $contrib= round($base * ($aliq / 100), 2);
+        // Colunas: A=CNAE, B=Rec Bruta, C=Exclusões, D=Alíquota
+        $recBruta   = $this->parseMoeda($row['B'] ?? 0);
+        $exclusoes  = $this->parseMoeda($row['C'] ?? 0);
+        $aliquota   = $this->parseMoeda($row['D'] ?? 0);
+        $base       = $recBruta - $exclusoes;
+        $cprb       = round($base * ($aliquota / 100), 2);
 
         $stmt = $this->db->prepare("
-            INSERT INTO r2060 (competencia_id, cnae, valor_rec_bruta, valor_rec_bruta_excl,
-            valor_base_calculo, aliquota, valor_contribuicao)
+            INSERT INTO r2060 (competencia_id, cnae, valor_rec_bruta, valor_exclusoes,
+            valor_base_calculo, aliquota, valor_cprb)
             VALUES (?, ?, ?, ?, ?, ?, ?)
         ");
-        $stmt->execute([$competenciaId, $cnae, $bruta, $excl, $base, $aliq, $contrib]);
+        $stmt->execute([
+            $competenciaId,
+            $row['A'] ?? '',
+            $recBruta,
+            $exclusoes,
+            $base,
+            $aliquota,
+            $cprb,
+        ]);
     }
+
+    // ─── R-4010 ──────────────────────────────────────────────
+
+    private function importarR4010(array $row, int $competenciaId): void
+    {
+        // Colunas: A=CPF, B=Nome, C=Natureza, D=Data Pagto, E=Bruto, F=Base IR, G=IR, H=Dedução
+        $stmt = $this->db->prepare("
+            INSERT INTO r4010 (competencia_id, cpf_beneficiario, nome_beneficiario, natureza_rendimento,
+            data_pagamento, valor_bruto, valor_base_ir, valor_ir, valor_deducao)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ");
+        $stmt->execute([
+            $competenciaId,
+            preg_replace('/\D/', '', $row['A'] ?? ''),
+            $row['B'] ?? '',
+            $row['C'] ?? '',
+            $this->parseData($row['D'] ?? null),
+            $this->parseMoeda($row['E'] ?? 0),
+            $this->parseMoeda($row['F'] ?? 0),
+            $this->parseMoeda($row['G'] ?? 0),
+            $this->parseMoeda($row['H'] ?? 0),
+        ]);
+    }
+
+    // ─── R-4020 ──────────────────────────────────────────────
+
+    private function importarR4020(array $row, int $competenciaId): void
+    {
+        // Colunas: A=CNPJ, B=Razão Social, C=Natureza, D=Data Pagto, E=Bruto, F=Base IR, G=IR, H=CSLL, I=COFINS, J=PIS
+        $stmt = $this->db->prepare("
+            INSERT INTO r4020 (competencia_id, cnpj_beneficiario, razao_social_beneficiario, natureza_rendimento,
+            data_pagamento, valor_bruto, valor_base_ir, valor_ir, valor_csll, valor_cofins, valor_pis)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ");
+        $stmt->execute([
+            $competenciaId,
+            preg_replace('/\D/', '', $row['A'] ?? ''),
+            $row['B'] ?? '',
+            $row['C'] ?? '',
+            $this->parseData($row['D'] ?? null),
+            $this->parseMoeda($row['E'] ?? 0),
+            $this->parseMoeda($row['F'] ?? 0),
+            $this->parseMoeda($row['G'] ?? 0),
+            $this->parseMoeda($row['H'] ?? 0),
+            $this->parseMoeda($row['I'] ?? 0),
+            $this->parseMoeda($row['J'] ?? 0),
+        ]);
+    }
+
+    // ─── Helpers ─────────────────────────────────────────────
 
     private function parseMoeda(mixed $val): float
     {
-        $v = str_replace(['R$', ' ', '.'], ['', '', ''], (string) $val);
-        $v = str_replace(',', '.', $v);
-        return (float) $v;
+        if (is_numeric($val)) return (float) $val;
+        $val = str_replace(['.', ','], ['', '.'], (string) $val);
+        return (float) $val;
     }
 
     private function parseData(mixed $val): ?string
     {
-        if (empty($val)) return null;
-
-        // Número serial do Excel
+        if (!$val) return null;
         if (is_numeric($val)) {
-            $date = \PhpOffice\PhpSpreadsheet\Shared\Date::excelToDateTimeObject((float)$val);
-            return $date->format('Y-m-d');
+            // Excel serial date
+            $unix = ($val - 25569) * 86400;
+            return date('Y-m-d', (int) $unix);
         }
-
-        // Formatos comuns BR
-        foreach (['d/m/Y', 'd-m-Y', 'Y-m-d'] as $fmt) {
-            $d = \DateTime::createFromFormat($fmt, trim((string)$val));
-            if ($d) return $d->format('Y-m-d');
-        }
-        return null;
+        $ts = strtotime((string) $val);
+        return $ts ? date('Y-m-d', $ts) : null;
     }
 }

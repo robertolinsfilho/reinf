@@ -1,45 +1,44 @@
 <?php if ($flash): ?>
-<div class="alert alert-<?= $flash['tipo'] === 'sucesso' ? 'success' : 'danger' ?> flash-alert">
+<div class="alert alert-<?= $flash['tipo'] === 'sucesso' ? 'success' : ($flash['tipo'] === 'erro' ? 'danger' : $flash['tipo']) ?> flash-alert">
     <?= htmlspecialchars($flash['mensagem']) ?>
 </div>
 <?php endif; ?>
 
 <div class="page-header">
-    <h5><i class="bi bi-calendar3 me-2"></i>Competência <?= $competencia['periodo'] ?></h5>
-    <a href="/competencias" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i> Voltar</a>
-</div>
-
-<!-- Info -->
-<div class="card mb-3">
-    <div class="card-body">
-        <div class="row g-3">
-            <div class="col-md-6">
-                <small class="text-muted">Contribuinte</small>
-                <div class="fw-600"><?= htmlspecialchars($competencia['razao_social']) ?></div>
-                <div class="font-monospace small text-muted"><?= $competencia['cnpj'] ?></div>
-            </div>
-            <div class="col-md-2">
-                <small class="text-muted">Período</small>
-                <div class="fw-600"><?= $competencia['periodo'] ?></div>
-            </div>
-            <div class="col-md-2">
-                <small class="text-muted">Status</small>
-                <div><span class="badge badge-status-<?= $competencia['status'] ?>"><?= ucfirst($competencia['status']) ?></span></div>
-            </div>
-            <div class="col-md-2 d-flex align-items-center gap-2">
-                <a href="/importar?competencia_id=<?= $competencia['id'] ?>" class="btn btn-sm btn-success">
-                    <i class="bi bi-upload me-1"></i> Importar
-                </a>
-                <a href="/gerar?competencia_id=<?= $competencia['id'] ?>" class="btn btn-sm btn-primary">
-                    <i class="bi bi-file-code me-1"></i> Gerar XML
-                </a>
-            </div>
-        </div>
+    <h5><?= htmlspecialchars($competencia['razao_social']) ?> — <?= $competencia['periodo'] ?></h5>
+    <div class="d-flex gap-2">
+        <?php
+        $cores = ['aberto'=>'secondary','fechado'=>'warning','transmitido'=>'success','retificado'=>'info'];
+        ?>
+        <span class="badge bg-<?= $cores[$competencia['status']] ?? 'secondary' ?> align-self-center"><?= ucfirst($competencia['status']) ?></span>
+        <a href="/competencias" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i> Voltar</a>
     </div>
 </div>
 
-<!-- Tabs de eventos -->
-<ul class="nav nav-tabs mb-3" id="eventosTabs">
+<!-- Ações -->
+<div class="d-flex gap-2 mb-3 flex-wrap">
+    <a href="/importar?competencia_id=<?= $competencia['id'] ?>" class="btn btn-outline-success btn-sm">
+        <i class="bi bi-file-earmark-excel me-1"></i> Importar Excel
+    </a>
+    <a href="/gerar?competencia_id=<?= $competencia['id'] ?>" class="btn btn-outline-primary btn-sm">
+        <i class="bi bi-file-earmark-code me-1"></i> Gerar XML
+    </a>
+    <a href="/transmissao?competencia_id=<?= $competencia['id'] ?>" class="btn btn-outline-info btn-sm">
+        <i class="bi bi-send me-1"></i> Transmitir
+    </a>
+</div>
+
+<!-- Resumo rápido -->
+<div class="row g-2 mb-3">
+    <div class="col"><div class="card p-3 text-center"><small class="text-muted d-block">R-2010</small><strong><?= count($r2010) ?></strong></div></div>
+    <div class="col"><div class="card p-3 text-center"><small class="text-muted d-block">R-2020</small><strong><?= count($r2020) ?></strong></div></div>
+    <div class="col"><div class="card p-3 text-center"><small class="text-muted d-block">R-2060</small><strong><?= count($r2060) ?></strong></div></div>
+    <div class="col"><div class="card p-3 text-center"><small class="text-muted d-block">R-4010</small><strong><?= count($r4010) ?></strong></div></div>
+    <div class="col"><div class="card p-3 text-center"><small class="text-muted d-block">R-4020</small><strong><?= count($r4020) ?></strong></div></div>
+</div>
+
+<!-- Tabs -->
+<ul class="nav nav-tabs">
     <li class="nav-item">
         <a class="nav-link active" data-bs-toggle="tab" href="#tab-r2010">
             R-2010 <span class="badge bg-secondary ms-1"><?= count($r2010) ?></span>
@@ -55,45 +54,43 @@
             R-2060 <span class="badge bg-secondary ms-1"><?= count($r2060) ?></span>
         </a>
     </li>
+    <li class="nav-item">
+        <a class="nav-link" data-bs-toggle="tab" href="#tab-r4010">
+            R-4010 <span class="badge bg-secondary ms-1"><?= count($r4010) ?></span>
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link" data-bs-toggle="tab" href="#tab-r4020">
+            R-4020 <span class="badge bg-secondary ms-1"><?= count($r4020) ?></span>
+        </a>
+    </li>
 </ul>
 
 <div class="tab-content">
     <!-- R-2010 -->
     <div class="tab-pane active" id="tab-r2010">
-        <div class="d-flex justify-content-between mb-2">
-            <h6 class="text-muted">Retenções INSS – Serviços Tomados</h6>
-            <a href="/eventos/r2010?competencia_id=<?= $competencia['id'] ?>" class="btn btn-sm btn-outline-primary">
-                <i class="bi bi-plus"></i> Adicionar
-            </a>
-        </div>
-        <div class="card">
-            <div class="table-responsive">
-                <table class="table mb-0 table-sm">
-                    <thead>
-                        <tr><th>CNPJ Prestador</th><th>Razão Social</th><th>Documento</th><th class="text-end">Valor Bruto</th><th class="text-end">Retenção</th></tr>
-                    </thead>
+        <div class="card border-top-0 rounded-0 rounded-bottom">
+            <div class="card-body p-0">
+                <div class="d-flex justify-content-end p-2">
+                    <a href="/eventos/r2010?competencia_id=<?= $competencia['id'] ?>" class="btn btn-sm btn-outline-primary">
+                        <i class="bi bi-pencil me-1"></i> Gerenciar R-2010
+                    </a>
+                </div>
+                <table class="table table-sm table-hover mb-0">
+                    <thead><tr><th>CNPJ Prestador</th><th>Razão Social</th><th>Doc.</th><th class="text-end">Bruto</th><th class="text-end">Retenção</th></tr></thead>
                     <tbody>
                         <?php if (empty($r2010)): ?>
-                        <tr><td colspan="5" class="text-center text-muted py-3">Nenhum registro</td></tr>
+                        <tr><td colspan="5" class="text-center text-muted py-3">Nenhum registro.</td></tr>
                         <?php else: foreach ($r2010 as $r): ?>
                         <tr>
                             <td class="font-monospace small"><?= $r['cnpj_prestador'] ?></td>
-                            <td><?= htmlspecialchars($r['razao_social_prestador'] ?? '') ?></td>
+                            <td style="font-size:.82rem"><?= htmlspecialchars($r['razao_social_prestador'] ?? '') ?></td>
                             <td class="small"><?= htmlspecialchars($r['num_documento'] ?? '') ?></td>
-                            <td class="text-end">R$ <?= number_format($r['valor_bruto'], 2, ',', '.') ?></td>
-                            <td class="text-end text-danger">R$ <?= number_format($r['valor_retencao'], 2, ',', '.') ?></td>
+                            <td class="text-end small">R$ <?= number_format($r['valor_bruto'], 2, ',', '.') ?></td>
+                            <td class="text-end small text-danger">R$ <?= number_format($r['valor_retencao'], 2, ',', '.') ?></td>
                         </tr>
                         <?php endforeach; endif; ?>
                     </tbody>
-                    <?php if (!empty($r2010)): ?>
-                    <tfoot class="table-light fw-bold">
-                        <tr>
-                            <td colspan="3" class="text-end">Total:</td>
-                            <td class="text-end">R$ <?= number_format(array_sum(array_column($r2010,'valor_bruto')), 2, ',', '.') ?></td>
-                            <td class="text-end text-danger">R$ <?= number_format(array_sum(array_column($r2010,'valor_retencao')), 2, ',', '.') ?></td>
-                        </tr>
-                    </tfoot>
-                    <?php endif; ?>
                 </table>
             </div>
         </div>
@@ -101,28 +98,25 @@
 
     <!-- R-2020 -->
     <div class="tab-pane" id="tab-r2020">
-        <div class="d-flex justify-content-between mb-2">
-            <h6 class="text-muted">Retenções INSS – Serviços Prestados</h6>
-            <a href="/eventos/r2020?competencia_id=<?= $competencia['id'] ?>" class="btn btn-sm btn-outline-primary">
-                <i class="bi bi-plus"></i> Adicionar
-            </a>
-        </div>
-        <div class="card">
-            <div class="table-responsive">
-                <table class="table mb-0 table-sm">
-                    <thead>
-                        <tr><th>CNPJ Tomador</th><th>Razão Social</th><th>Documento</th><th class="text-end">Valor Bruto</th><th class="text-end">Retenção</th></tr>
-                    </thead>
+        <div class="card border-top-0 rounded-0 rounded-bottom">
+            <div class="card-body p-0">
+                <div class="d-flex justify-content-end p-2">
+                    <a href="/eventos/r2020?competencia_id=<?= $competencia['id'] ?>" class="btn btn-sm btn-outline-primary">
+                        <i class="bi bi-pencil me-1"></i> Gerenciar R-2020
+                    </a>
+                </div>
+                <table class="table table-sm table-hover mb-0">
+                    <thead><tr><th>CNPJ Tomador</th><th>Razão Social</th><th>Doc.</th><th class="text-end">Bruto</th><th class="text-end">Retenção</th></tr></thead>
                     <tbody>
                         <?php if (empty($r2020)): ?>
-                        <tr><td colspan="5" class="text-center text-muted py-3">Nenhum registro</td></tr>
+                        <tr><td colspan="5" class="text-center text-muted py-3">Nenhum registro.</td></tr>
                         <?php else: foreach ($r2020 as $r): ?>
                         <tr>
                             <td class="font-monospace small"><?= $r['cnpj_tomador'] ?></td>
-                            <td><?= htmlspecialchars($r['razao_social_tomador'] ?? '') ?></td>
+                            <td style="font-size:.82rem"><?= htmlspecialchars($r['razao_social_tomador'] ?? '') ?></td>
                             <td class="small"><?= htmlspecialchars($r['num_documento'] ?? '') ?></td>
-                            <td class="text-end">R$ <?= number_format($r['valor_bruto'], 2, ',', '.') ?></td>
-                            <td class="text-end text-danger">R$ <?= number_format($r['valor_retencao'], 2, ',', '.') ?></td>
+                            <td class="text-end small">R$ <?= number_format($r['valor_bruto'], 2, ',', '.') ?></td>
+                            <td class="text-end small text-danger">R$ <?= number_format($r['valor_retencao'], 2, ',', '.') ?></td>
                         </tr>
                         <?php endforeach; endif; ?>
                     </tbody>
@@ -133,29 +127,87 @@
 
     <!-- R-2060 -->
     <div class="tab-pane" id="tab-r2060">
-        <div class="d-flex justify-content-between mb-2">
-            <h6 class="text-muted">CPRB – Contribuição Previdenciária sobre Receita Bruta</h6>
-            <a href="/eventos/r2060?competencia_id=<?= $competencia['id'] ?>" class="btn btn-sm btn-outline-primary">
-                <i class="bi bi-plus"></i> Adicionar
-            </a>
-        </div>
-        <div class="card">
-            <div class="table-responsive">
-                <table class="table mb-0 table-sm">
-                    <thead>
-                        <tr><th>CNAE</th><th class="text-end">Rec. Bruta</th><th class="text-end">Exclusões</th><th class="text-end">Base Cálculo</th><th class="text-end">Alíq.</th><th class="text-end">Contribuição</th></tr>
-                    </thead>
+        <div class="card border-top-0 rounded-0 rounded-bottom">
+            <div class="card-body p-0">
+                <div class="d-flex justify-content-end p-2">
+                    <a href="/eventos/r2060?competencia_id=<?= $competencia['id'] ?>" class="btn btn-sm btn-outline-primary">
+                        <i class="bi bi-pencil me-1"></i> Gerenciar R-2060
+                    </a>
+                </div>
+                <table class="table table-sm table-hover mb-0">
+                    <thead><tr><th>CNAE</th><th class="text-end">Rec. Bruta</th><th class="text-end">Exclusões</th><th class="text-end">Base</th><th>Alíq.</th><th class="text-end">CPRB</th></tr></thead>
                     <tbody>
                         <?php if (empty($r2060)): ?>
-                        <tr><td colspan="6" class="text-center text-muted py-3">Nenhum registro</td></tr>
+                        <tr><td colspan="6" class="text-center text-muted py-3">Nenhum registro.</td></tr>
                         <?php else: foreach ($r2060 as $r): ?>
                         <tr>
-                            <td><?= $r['cnae'] ?></td>
-                            <td class="text-end">R$ <?= number_format($r['valor_rec_bruta'], 2, ',', '.') ?></td>
-                            <td class="text-end">R$ <?= number_format($r['valor_rec_bruta_excl'], 2, ',', '.') ?></td>
-                            <td class="text-end">R$ <?= number_format($r['valor_base_calculo'], 2, ',', '.') ?></td>
-                            <td class="text-end"><?= $r['aliquota'] ?>%</td>
-                            <td class="text-end text-danger fw-bold">R$ <?= number_format($r['valor_contribuicao'], 2, ',', '.') ?></td>
+                            <td class="font-monospace small"><?= $r['cnae'] ?></td>
+                            <td class="text-end small">R$ <?= number_format($r['valor_rec_bruta'], 2, ',', '.') ?></td>
+                            <td class="text-end small">R$ <?= number_format($r['valor_exclusoes'], 2, ',', '.') ?></td>
+                            <td class="text-end small">R$ <?= number_format($r['valor_base_calculo'], 2, ',', '.') ?></td>
+                            <td class="small"><?= number_format($r['aliquota'], 2, ',', '.') ?>%</td>
+                            <td class="text-end small text-danger">R$ <?= number_format($r['valor_cprb'], 2, ',', '.') ?></td>
+                        </tr>
+                        <?php endforeach; endif; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- R-4010 -->
+    <div class="tab-pane" id="tab-r4010">
+        <div class="card border-top-0 rounded-0 rounded-bottom">
+            <div class="card-body p-0">
+                <div class="d-flex justify-content-end p-2">
+                    <a href="/eventos/r4010?competencia_id=<?= $competencia['id'] ?>" class="btn btn-sm btn-outline-primary">
+                        <i class="bi bi-pencil me-1"></i> Gerenciar R-4010
+                    </a>
+                </div>
+                <table class="table table-sm table-hover mb-0">
+                    <thead><tr><th>CPF</th><th>Beneficiário</th><th>Nat.</th><th>Data</th><th class="text-end">Bruto</th><th class="text-end">IR</th></tr></thead>
+                    <tbody>
+                        <?php if (empty($r4010)): ?>
+                        <tr><td colspan="6" class="text-center text-muted py-3">Nenhum registro.</td></tr>
+                        <?php else: foreach ($r4010 as $r): ?>
+                        <tr>
+                            <td class="font-monospace small"><?= $r['cpf_beneficiario'] ?></td>
+                            <td style="font-size:.82rem"><?= htmlspecialchars($r['nome_beneficiario'] ?? '') ?></td>
+                            <td class="font-monospace small"><?= $r['natureza_rendimento'] ?></td>
+                            <td class="small"><?= $r['data_pagamento'] ? date('d/m/Y', strtotime($r['data_pagamento'])) : '' ?></td>
+                            <td class="text-end small">R$ <?= number_format($r['valor_bruto'], 2, ',', '.') ?></td>
+                            <td class="text-end small text-danger">R$ <?= number_format($r['valor_ir'], 2, ',', '.') ?></td>
+                        </tr>
+                        <?php endforeach; endif; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- R-4020 -->
+    <div class="tab-pane" id="tab-r4020">
+        <div class="card border-top-0 rounded-0 rounded-bottom">
+            <div class="card-body p-0">
+                <div class="d-flex justify-content-end p-2">
+                    <a href="/eventos/r4020?competencia_id=<?= $competencia['id'] ?>" class="btn btn-sm btn-outline-primary">
+                        <i class="bi bi-pencil me-1"></i> Gerenciar R-4020
+                    </a>
+                </div>
+                <table class="table table-sm table-hover mb-0">
+                    <thead><tr><th>CNPJ</th><th>Beneficiário</th><th>Data</th><th class="text-end">Bruto</th><th class="text-end">IR</th><th class="text-end">CSLL</th><th class="text-end">PIS/COF</th></tr></thead>
+                    <tbody>
+                        <?php if (empty($r4020)): ?>
+                        <tr><td colspan="7" class="text-center text-muted py-3">Nenhum registro.</td></tr>
+                        <?php else: foreach ($r4020 as $r): ?>
+                        <tr>
+                            <td class="font-monospace small"><?= $r['cnpj_beneficiario'] ?></td>
+                            <td style="font-size:.82rem"><?= htmlspecialchars($r['razao_social_beneficiario'] ?? '') ?></td>
+                            <td class="small"><?= $r['data_pagamento'] ? date('d/m/Y', strtotime($r['data_pagamento'])) : '' ?></td>
+                            <td class="text-end small">R$ <?= number_format($r['valor_bruto'], 2, ',', '.') ?></td>
+                            <td class="text-end small text-danger">R$ <?= number_format($r['valor_ir'], 2, ',', '.') ?></td>
+                            <td class="text-end small">R$ <?= number_format($r['valor_csll'], 2, ',', '.') ?></td>
+                            <td class="text-end small">R$ <?= number_format(($r['valor_pis'] ?? 0) + ($r['valor_cofins'] ?? 0), 2, ',', '.') ?></td>
                         </tr>
                         <?php endforeach; endif; ?>
                     </tbody>
