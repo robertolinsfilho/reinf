@@ -27,16 +27,26 @@
         <a href="/competencias" class="nav-item <?= str_contains($_SERVER['REQUEST_URI'], 'competencia') ? 'active' : '' ?>">
             <i class="bi bi-calendar3"></i> Competências
         </a>
-        <div class="nav-label">EVENTOS</div>
+
+        <div class="nav-label">PREVIDÊNCIA (INSS)</div>
         <a href="/eventos/r2010" class="nav-item sub <?= str_contains($_SERVER['REQUEST_URI'], 'r2010') ? 'active' : '' ?>">
-            <i class="bi bi-arrow-right-short"></i> R-2010 Contratados
+            <i class="bi bi-arrow-right-short"></i> R-2010 Serv. Tomados
         </a>
         <a href="/eventos/r2020" class="nav-item sub <?= str_contains($_SERVER['REQUEST_URI'], 'r2020') ? 'active' : '' ?>">
-            <i class="bi bi-arrow-right-short"></i> R-2020 Contratantes
+            <i class="bi bi-arrow-right-short"></i> R-2020 Serv. Prestados
         </a>
         <a href="/eventos/r2060" class="nav-item sub <?= str_contains($_SERVER['REQUEST_URI'], 'r2060') ? 'active' : '' ?>">
             <i class="bi bi-arrow-right-short"></i> R-2060 CPRB
         </a>
+
+        <div class="nav-label">IRRF / CSRF (DIRF)</div>
+        <a href="/eventos/r4010" class="nav-item sub <?= str_contains($_SERVER['REQUEST_URI'], 'r4010') ? 'active' : '' ?>">
+            <i class="bi bi-arrow-right-short"></i> R-4010 Pagtos PF
+        </a>
+        <a href="/eventos/r4020" class="nav-item sub <?= str_contains($_SERVER['REQUEST_URI'], 'r4020') ? 'active' : '' ?>">
+            <i class="bi bi-arrow-right-short"></i> R-4020 Pagtos PJ
+        </a>
+
         <div class="nav-label">PROCESSAMENTO</div>
         <a href="/importar" class="nav-item <?= str_contains($_SERVER['REQUEST_URI'], 'importar') ? 'active' : '' ?>">
             <i class="bi bi-file-earmark-excel"></i> Importar Excel
@@ -44,6 +54,13 @@
         <a href="/gerar" class="nav-item <?= str_contains($_SERVER['REQUEST_URI'], 'gerar') ? 'active' : '' ?>">
             <i class="bi bi-file-earmark-code"></i> Gerar XML
         </a>
+        <a href="/transmissao" class="nav-item <?= str_contains($_SERVER['REQUEST_URI'], 'transmissao') ? 'active' : '' ?>">
+            <i class="bi bi-send"></i> Transmissão
+        </a>
+        <a href="/certificados" class="nav-item <?= str_contains($_SERVER['REQUEST_URI'], 'certificado') ? 'active' : '' ?>">
+            <i class="bi bi-shield-lock"></i> Certificado A1
+        </a>
+
         <?php if (($usuario['perfil'] ?? '') === 'admin'): ?>
         <div class="nav-label">ADMIN</div>
         <a href="/usuarios" class="nav-item <?= str_contains($_SERVER['REQUEST_URI'], 'usuario') ? 'active' : '' ?>">
@@ -80,7 +97,6 @@ function toggleSidebar() {
     document.getElementById('sidebar').classList.toggle('collapsed');
     document.querySelector('.main-content').classList.toggle('expanded');
 }
-// Máscara simples CNPJ
 document.querySelectorAll('input[data-mask="cnpj"]').forEach(el => {
     el.addEventListener('input', function() {
         let v = this.value.replace(/\D/g,'').slice(0,14);
