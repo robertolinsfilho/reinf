@@ -12,8 +12,7 @@ RUN apt-get update && apt-get install -y \
     zip \
     unzip \
     && docker-php-ext-install \
-        pdo_mysql mbstring exif pcntl bcmath gd zip \
-        soap dom curl openssl \
+        pdo_mysql mbstring exif pcntl bcmath gd zip soap \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
@@ -23,7 +22,7 @@ WORKDIR /var/www/html
 
 COPY . .
 
-RUN composer install --no-dev --optimize-autoloader
+RUN composer update --no-dev --optimize-autoloader --no-interaction
 
 RUN mkdir -p /var/www/html/public/uploads/xml \
     && mkdir -p /var/www/html/storage/certs \

@@ -11,10 +11,6 @@ class EventoRepository
         $this->db = $db;
     }
 
-    /**
-     * Busca registros de qualquer evento por competência.
-     * @param string $evento r2010|r2020|r2060|r4010|r4020
-     */
     public function listar(string $evento, int $competenciaId, string $orderBy = 'created_at DESC'): array
     {
         $tabela = $this->validarTabela($evento);
@@ -41,15 +37,21 @@ class EventoRepository
         return (int) $this->db->lastInsertId();
     }
 
+    public function atualizar(string $evento, int $id, int $competenciaId, array $data): void
+    {
+        $tabela = $this->validarTabela($evento);
+        $sets   = implode(', ', array_map(fn($k) => "{$k} = ?", array_keys($data)));
+        $this->db->prepare("UPDATE {$tabela} SET {$sets} WHERE id = ? AND competencia_id = ?")
+            ->execute([...array_values($data), $id, $competenciaId]);
+    }
+
     public function excluir(string $evento, int $id, int $competenciaId): void
     {
         $tabela = $this->validarTabela($evento);
-        $this->db->prepare("DELETE FROM {$tabela} WHERE id = ? AND competencia_id = ?")->execute([$id, $competenciaId]);
+        $this->db->prepare("DELETE FROM {$tabela} WHERE id = ? AND competencia_id = ?")
+            ->execute([$id, $competenciaId]);
     }
 
-    /**
-     * Carrega todos os eventos de uma competência (para detalhe).
-     */
     public function carregarTodos(int $competenciaId): array
     {
         return [

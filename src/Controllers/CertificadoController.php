@@ -2,85 +2,82 @@
 
 namespace App\Controllers;
 
-use App\Models\UsuarioRepository;
+use App\Models\CertificadoRepository;
+use App\Services\AssinaturaService;
 
-class UsuarioController extends BaseController
+class CertificadoController extends BaseController
 {
-    private UsuarioRepository $repo;
+    private CertificadoRepository $repo;
 
     public function __construct(array $config)
     {
         parent::__construct($config);
-        $this->repo = new UsuarioRepository($this->db);
+        $this->repo = new CertificadoRepository($this->db);
     }
 
     public function index(): void
     {
-        $this->requireAdmin();
-        $this->view('pages/usuarios/index', [
-            'pageTitle' => 'Usuários',
-            'usuarios'  => $this->repo->listAll(),
-            'flash'     => $this->getFlash(),
-        ]);
-    }
+        $this->requireLogin();
+        $certs = $this->repo->listAll();
 
-    public function novo(): void
-    {
-        $this->requireAdmin();
-        $this->view('pages/usuarios/form', [
-            'pageTitle' => 'Novo Usuário',
-            'usuario'   => null,
-            'flash'     => $this->getFlash(),
-        ]);
-    }
-
-    public function salvar(): void
-    {
-        $this->requireAdmin();
-        $nome  = $this->sanitize($this->post('nome', ''));
-        $email = $this->sanitize($this->post('email', ''));
-        $senha = $this->post('senha', '');
-
-        if (!$nome || !$email || !$senha) {
-            $this->redirect('/usuarios/novo', 'Nome, e-mail e senha são obrigatórios.', 'erro');
+        $certAtivo = null;
+        foreach ($certs as $c) {
+            if ($c['ativo']) {
+                $certAtivo = (new AssinaturaService())->infoCertificado($c['caminho'], '');
+                break;
+            }
         }
 
-        $this->safeExecute(function () use ($nome, $email, $senha) {
-            $this->repo->criar(
-                $nome,
-                $email,
-                password_hash($senha, PASSWORD_BCRYPT),
-                $this->post('perfil', 'usuario'),
-                $this->post('trial_expira') ?: null
-            );
-            $this->redirect('/usuarios', 'Usuário criado!', 'sucesso');
-        }, '/usuarios/novo');
-    }
-
-    public function perfil(): void
-    {
-        $this->requireLogin();
-        $this->view('pages/usuarios/perfil', [
-            'pageTitle' => 'Meu Perfil',
-            'usuario'   => $this->repo->find($this->userId()),
-            'flash'     => $this->getFlash(),
+        $this->view('pages/certificados/index', [
+            'pageTitle'    => 'Certificado Digital A1',
+            'certificados' => $certs,
+            'certAtivo'    => $certAtivo,
         ]);
     }
 
-    public function salvarPerfil(): void
+    public function upload(): void
     {
         $this->requireLogin();
-        $nome  = $this->sanitize($this->post('nome', ''));
-        $senha = $this->post('senha', '');
 
-        if (!$nome) {
-            $this->redirect('/perfil', 'Nome é obrigatório.', 'erro');
+        if (empty($_FILES['certificado']['tmp_name'])) {
+            $this->redirect('/certificados', 'Selecione um arquivo PFX/P12.', 'erro');
         }
 
-        $hash = $senha ? password_hash($senha, PASSWORD_BCRYPT) : null;
-        $this->repo->atualizarPerfil($this->userId(), $nome, $hash);
+        $file = $_FILES['certificado'];
+        $ext  = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
 
-        $_SESSION['usuario']['nome'] = $nome;
-        $this->redirect('/perfil', 'Perfil atualizado!', 'sucesso');
+        if (!in_array($ext, ['pfx', 'p12'])) {
+            $this->redirect('/certificados', 'Apenas .pfx ou .p12.', 'erro');
+        }
+
+        $senha      = $this->post('senha', '');
+        $pfxContent = file_get_contents($file['tmp_name']);
+        $certs      = [];
+
+        if (!openssl_pkcs12_read($pfxContent, $certs, $senha)) {
+            $this->redirect('/certificados', 'Não foi possível abrir o certificado. Verifique a senha.', 'erro');
+        }
+
+        $certData = openssl_x509_parse($certs['cert']);
+        $cn       = $certData['subject']['CN'] ?? 'Desconhecido';
+        $validTo  = $certData['validTo_time_t'] ?? 0;
+        $cnpjCert = '';
+
+        if (preg_match('/\d{14}/', $certData['subject']['OU'] ?? '', $m)) {
+            $cnpjCert = $m[0];
+        }
+
+        $destDir = $this->config['reinf']['cert_path'] ?? BASE_PATH . '/storage/certs/';
+        if (!is_dir($destDir)) {
+            mkdir($destDir, 0755, true);
+        }
+        $destFile = $destDir . 'cert_' . date('Ymd_His') . '.' . $ext;
+        move_uploaded_file($file['tmp_name'], $destFile);
+
+        $contribId = (int) $this->post('contribuinte_id', 1);
+        $this->repo->desativarTodos($contribId);
+        $this->repo->criar($contribId, $file['name'], $destFile, $cnpjCert, $cn, date('Y-m-d', $validTo));
+
+        $this->redirect('/certificados', "Certificado '{$cn}' importado! Válido até " . date('d/m/Y', $validTo), 'sucesso');
     }
 }
