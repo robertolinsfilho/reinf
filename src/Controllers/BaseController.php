@@ -18,10 +18,10 @@ abstract class BaseController
     protected function view(string $template, array $data = []): void
     {
         extract($data);
-        $config    = $this->config;
-        $baseUrl   = $this->config['app']['url'];
-        $appName   = $this->config['app']['name'];
-        $usuario   = $_SESSION['usuario'] ?? null;
+        $config  = $this->config;
+        $baseUrl = $this->config['app']['url'];
+        $appName = $this->config['app']['name'];
+        $usuario = $_SESSION['usuario'] ?? null;
 
         $viewPath = BASE_PATH . '/src/Views/' . $template . '.php';
         if (!file_exists($viewPath)) {
@@ -41,10 +41,6 @@ abstract class BaseController
         include $layout;
     }
 
-    /**
-     * Redireciona. Aceita mensagem flash opcional.
-     * Compatível com: redirect('/url') e redirect('/url', 'msg', 'tipo')
-     */
     protected function redirect(string $url, ?string $mensagem = null, string $tipo = 'info'): void
     {
         if ($mensagem !== null) {
@@ -74,7 +70,6 @@ abstract class BaseController
         }
     }
 
-    /** Alias para requireLogin — compatibilidade com novos controllers */
     protected function requireAuth(): void
     {
         $this->requireLogin();
@@ -84,6 +79,7 @@ abstract class BaseController
     {
         $this->requireLogin();
         if (($_SESSION['usuario']['perfil'] ?? '') !== 'admin') {
+            $this->flash('erro', 'Acesso restrito a administradores.');
             $this->redirect('/dashboard');
         }
     }
@@ -113,5 +109,67 @@ abstract class BaseController
     protected function sanitize(string $value): string
     {
         return htmlspecialchars(trim($value), ENT_QUOTES, 'UTF-8');
+    }
+
+    // ─── CSRF ────────────────────────────────────────────────
+
+    protected function csrfToken(): string
+    {
+        if (empty($_SESSION['csrf_token'])) {
+            $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+        }
+        return $_SESSION['csrf_token'];
+    }
+
+    protected function csrfField(): string
+    {
+        return '<input type="hidden" name="_token" value="' . $this->csrfToken() . '">';
+    }
+
+    protected function verifyCsrf(): void
+    {
+        $token = $this->post('_token', '');
+        if (!hash_equals($this->csrfToken(), $token)) {
+            $this->flash('erro', 'Token de segurança inválido. Tente novamente.');
+            $this->redirect($_SERVER['HTTP_REFERER'] ?? '/dashboard');
+        }
+    }
+
+    // ─── Error handling ──────────────────────────────────────
+
+    protected function safeExecute(callable $fn, string $redirectUrl, string $errorPrefix = 'Erro'): void
+    {
+        try {
+            $fn();
+        } catch (\PDOException $e) {
+            error_log("DB Error: " . $e->getMessage());
+            $this->redirect($redirectUrl, "{$errorPrefix}: Erro no banco de dados.", 'erro');
+        } catch (\Exception $e) {
+            error_log("Error: " . $e->getMessage());
+            $this->redirect($redirectUrl, "{$errorPrefix}: " . $e->getMessage(), 'erro');
+        }
+    }
+
+    // ─── Input helpers ───────────────────────────────────────
+
+    protected function postMoney(string $key): float
+    {
+        $val = $this->post($key, '0');
+        return (float) str_replace(['.', ','], ['', '.'], $val);
+    }
+
+    protected function postCnpj(string $key): string
+    {
+        return preg_replace('/\D/', '', $this->post($key, ''));
+    }
+
+    protected function postCpf(string $key): string
+    {
+        return preg_replace('/\D/', '', $this->post($key, ''));
+    }
+
+    protected function userId(): int
+    {
+        return (int) ($_SESSION['usuario']['id'] ?? 0);
     }
 }

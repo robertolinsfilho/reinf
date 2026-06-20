@@ -14,7 +14,7 @@ if (file_exists(BASE_PATH . '/.env')) {
 
 session_start();
 
-$config = require BASE_PATH . '/config/app.php';
+$config = \App\Models\AppConfig::get();
 
 $uri    = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 $method = $_SERVER['REQUEST_METHOD'];

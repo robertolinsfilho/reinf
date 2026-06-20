@@ -15,7 +15,7 @@ class TransmissaoService
 
     public function __construct(private \PDO $db)
     {
-        $config = require BASE_PATH . '/config/app.php';
+        $config = \App\Models\AppConfig::get();
         $reinf  = $config['reinf'];
 
         $this->tpAmb       = $reinf['tp_amb'];
@@ -153,7 +153,7 @@ class TransmissaoService
             return ['http_code' => 0, 'body' => 'URL de envio não configurada'];
         }
 
-        $config   = require BASE_PATH . '/config/app.php';
+        $config = \App\Models\AppConfig::get();
         $certPath = (new AssinaturaService())->infoCertificado();
 
         $ch = curl_init($url);
@@ -204,7 +204,7 @@ class TransmissaoService
 
     private function findCert(string $ext): string
     {
-        $config = require BASE_PATH . '/config/app.php';
+        $config = \App\Models\AppConfig::get();
         $dir    = $config['reinf']['cert_path'] ?? '';
         $files  = glob($dir . '*.{' . $ext . '}', GLOB_BRACE);
         return $files[0] ?? '';

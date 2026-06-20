@@ -13,7 +13,7 @@ class AssinaturaService
 
     public function __construct()
     {
-        $config = require BASE_PATH . '/config/app.php';
+        $config = \App\Models\AppConfig::get();
         $this->certPath = $config['reinf']['cert_path'] ?? '';
         $this->certPass = $config['reinf']['cert_pass'] ?? '';
     }

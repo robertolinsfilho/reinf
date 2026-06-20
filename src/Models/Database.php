@@ -21,7 +21,7 @@ class Database
             $c = self::$cachedConfig;
             if (empty($c)) {
                 // Fallback: ler do config/app.php
-                $appConfig = require BASE_PATH . '/config/app.php';
+                $config = \App\Models\AppConfig::get();
                 $c = $appConfig['db'];
                 self::$cachedConfig = $c;
             }

@@ -20,7 +20,7 @@ class GeracaoXmlService
             mkdir($this->outputDir, 0755, true);
         }
 
-        $config = require BASE_PATH . '/config/app.php';
+        $config = \App\Models\AppConfig::get();
         $this->tpAmb   = $config['reinf']['tp_amb'] ?? 2;
         $this->verProc = $config['reinf']['ver_proc'] ?? 'EFD-REINF-WEB-1.0';
         $this->procEmi = $config['reinf']['proc_emi'] ?? 1;
