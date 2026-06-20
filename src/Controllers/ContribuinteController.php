@@ -2,22 +2,25 @@
 
 namespace App\Controllers;
 
+use App\Models\ContribuinteRepository;
 use App\Services\ValidacaoService;
 
 class ContribuinteController extends BaseController
 {
+    private ContribuinteRepository $repo;
+
+    public function __construct(array $config)
+    {
+        parent::__construct($config);
+        $this->repo = new ContribuinteRepository($this->db);
+    }
+
     public function index(): void
     {
         $this->requireLogin();
-        $uid = $_SESSION['usuario']['id'];
-
-        $stmt = $this->db->prepare("SELECT * FROM contribuintes WHERE usuario_id = ? ORDER BY razao_social");
-        $stmt->execute([$uid]);
-        $contribuintes = $stmt->fetchAll();
-
         $this->view('pages/contribuintes/index', [
             'pageTitle'     => 'Contribuintes',
-            'contribuintes' => $contribuintes,
+            'contribuintes' => $this->repo->listByUser($this->userId()),
             'flash'         => $this->getFlash(),
         ]);
     }
@@ -35,18 +38,10 @@ class ContribuinteController extends BaseController
     public function editar(): void
     {
         $this->requireLogin();
-        $id  = (int) $this->get('id');
-        $uid = $_SESSION['usuario']['id'];
-
-        $stmt = $this->db->prepare("SELECT * FROM contribuintes WHERE id = ? AND usuario_id = ?");
-        $stmt->execute([$id, $uid]);
-        $contribuinte = $stmt->fetch();
-
+        $contribuinte = $this->repo->findByUser((int) $this->get('id'), $this->userId());
         if (!$contribuinte) {
-            $this->flash('erro', 'Contribuinte não encontrado.');
-            $this->redirect('/contribuintes');
+            $this->redirect('/contribuintes', 'Contribuinte não encontrado.', 'erro');
         }
-
         $this->view('pages/contribuintes/form', [
             'pageTitle'    => 'Editar Contribuinte',
             'contribuinte' => $contribuinte,
@@ -57,60 +52,46 @@ class ContribuinteController extends BaseController
     public function salvar(): void
     {
         $this->requireLogin();
-        $uid = $_SESSION['usuario']['id'];
+        $uid = $this->userId();
         $id  = (int) $this->post('id', 0);
 
         $dados = [
-            'cnpj'                   => preg_replace('/\D/', '', $this->post('cnpj', '')),
+            'cnpj'                   => $this->postCnpj('cnpj'),
             'razao_social'           => $this->sanitize($this->post('razao_social', '')),
             'nome_fantasia'          => $this->sanitize($this->post('nome_fantasia', '')),
             'tipo_contribuinte'      => $this->post('tipo_contribuinte', '1'),
             'classificacao_tributos' => $this->sanitize($this->post('classificacao_tributos', '')),
         ];
 
+        $redirect = $id ? "/contribuintes/editar?id={$id}" : '/contribuintes/novo';
+
         if (empty($dados['cnpj']) || empty($dados['razao_social'])) {
-            $this->flash('erro', 'CNPJ e Razão Social são obrigatórios.');
-            $this->redirect($id ? "/contribuintes/editar?id={$id}" : '/contribuintes/novo');
+            $this->redirect($redirect, 'CNPJ e Razão Social são obrigatórios.', 'erro');
         }
 
-        // Valida dígito verificador apenas para CNPJ e CPF (pula CAEPF, CNO, CEI)
         if (in_array($dados['tipo_contribuinte'], ['1', '2'])) {
             if (!ValidacaoService::cnpjOuCpf($dados['cnpj'])) {
-                $this->flash('erro', 'CNPJ/CPF inválido. Verifique os dígitos verificadores.');
-                $this->redirect($id ? "/contribuintes/editar?id={$id}" : '/contribuintes/novo');
+                $this->redirect($redirect, 'CNPJ/CPF inválido.', 'erro');
             }
         }
 
-        if ($id) {
-            $stmt = $this->db->prepare("
-                UPDATE contribuintes
-                SET cnpj=?, razao_social=?, nome_fantasia=?, tipo_contribuinte=?, classificacao_tributos=?
-                WHERE id=? AND usuario_id=?
-            ");
-            $stmt->execute([...array_values($dados), $id, $uid]);
-            $this->flash('sucesso', 'Contribuinte atualizado com sucesso.');
-        } else {
-            $stmt = $this->db->prepare("
-                INSERT INTO contribuintes (usuario_id, cnpj, razao_social, nome_fantasia, tipo_contribuinte, classificacao_tributos)
-                VALUES (?, ?, ?, ?, ?, ?)
-            ");
-            $stmt->execute([$uid, ...array_values($dados)]);
-            $this->flash('sucesso', 'Contribuinte cadastrado com sucesso.');
-        }
-
-        $this->redirect('/contribuintes');
+        $this->safeExecute(function () use ($id, $uid, $dados) {
+            if ($id) {
+                $this->repo->atualizar($id, $uid, $dados);
+                $this->redirect('/contribuintes', 'Contribuinte atualizado.', 'sucesso');
+            } else {
+                $this->repo->criar($uid, $dados);
+                $this->redirect('/contribuintes', 'Contribuinte cadastrado.', 'sucesso');
+            }
+        }, $redirect);
     }
 
     public function excluir(): void
     {
         $this->requireLogin();
-        $id  = (int) $this->get('id');
-        $uid = $_SESSION['usuario']['id'];
-
-        $stmt = $this->db->prepare("DELETE FROM contribuintes WHERE id = ? AND usuario_id = ?");
-        $stmt->execute([$id, $uid]);
-
-        $this->flash('sucesso', 'Contribuinte excluído com sucesso.');
-        $this->redirect('/contribuintes');
+        $this->safeExecute(function () {
+            $this->repo->excluir((int) $this->get('id'), $this->userId());
+            $this->redirect('/contribuintes', 'Contribuinte excluído.', 'sucesso');
+        }, '/contribuintes');
     }
 }

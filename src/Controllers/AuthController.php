@@ -2,6 +2,8 @@
 
 namespace App\Controllers;
 
+use App\Models\UsuarioRepository;
+
 class AuthController extends BaseController
 {
     public function loginForm(): void
@@ -9,8 +11,7 @@ class AuthController extends BaseController
         if ($this->isLoggedIn()) {
             $this->redirect('/dashboard');
         }
-        $flash = $this->getFlash();
-        $this->view('pages/login', ['flash' => $flash, 'pageTitle' => 'Login']);
+        $this->view('pages/login', ['flash' => $this->getFlash(), 'pageTitle' => 'Login']);
     }
 
     public function login(): void
@@ -19,23 +20,18 @@ class AuthController extends BaseController
         $senha = $this->post('senha', '');
 
         if (empty($email) || empty($senha)) {
-            $this->flash('erro', 'Preencha e-mail e senha.');
-            $this->redirect('/login');
+            $this->redirect('/login', 'Preencha e-mail e senha.', 'erro');
         }
 
-        $stmt = $this->db->prepare("SELECT * FROM usuarios WHERE email = ? AND ativo = 1");
-        $stmt->execute([$email]);
-        $usuario = $stmt->fetch();
+        $repo    = new UsuarioRepository($this->db);
+        $usuario = $repo->findByEmail($email);
 
         if (!$usuario || !password_verify($senha, $usuario['senha'])) {
-            $this->flash('erro', 'E-mail ou senha incorretos.');
-            $this->redirect('/login');
+            $this->redirect('/login', 'E-mail ou senha incorretos.', 'erro');
         }
 
-        // Verificar trial
-        if ($usuario['trial_expira'] && $usuario['trial_expira'] < date('Y-m-d')) {
-            $this->flash('erro', 'Seu período de teste expirou. Entre em contato.');
-            $this->redirect('/login');
+        if (!empty($usuario['trial_expira']) && $usuario['trial_expira'] < date('Y-m-d')) {
+            $this->redirect('/login', 'Seu período de teste expirou. Entre em contato.', 'erro');
         }
 
         $_SESSION['usuario'] = [

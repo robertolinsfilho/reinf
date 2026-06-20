@@ -2,60 +2,33 @@
 
 namespace App\Controllers;
 
+use App\Models\ContribuinteRepository;
+use App\Models\CompetenciaRepository;
+
 class DashboardController extends BaseController
 {
     public function index(): void
     {
         $this->requireLogin();
-        $uid = $_SESSION['usuario']['id'];
+        $uid = $this->userId();
 
-        // Totais
-        $stmt = $this->db->prepare("SELECT COUNT(*) FROM contribuintes WHERE usuario_id = ?");
-        $stmt->execute([$uid]);
-        $totalContribuintes = $stmt->fetchColumn();
+        $contribuintes  = new ContribuinteRepository($this->db);
+        $competencias   = new CompetenciaRepository($this->db);
 
-        $stmt = $this->db->prepare("
-            SELECT COUNT(*) FROM competencias c
-            JOIN contribuintes co ON co.id = c.contribuinte_id
-            WHERE co.usuario_id = ?
-        ");
-        $stmt->execute([$uid]);
-        $totalCompetencias = $stmt->fetchColumn();
+        $totalContribuintes = $contribuintes->countByUser($uid);
+        $totalCompetencias  = (int) $competencias->scalar(
+            "SELECT COUNT(*) FROM competencias c JOIN contribuintes co ON co.id = c.contribuinte_id WHERE co.usuario_id = ?",
+            [$uid]
+        );
+        $totalTransmitidos  = (int) $competencias->scalar(
+            "SELECT COUNT(*) FROM competencias c JOIN contribuintes co ON co.id = c.contribuinte_id WHERE co.usuario_id = ? AND c.status = 'transmitido'",
+            [$uid]
+        );
 
-        $stmt = $this->db->prepare("
-            SELECT COUNT(*) FROM competencias c
-            JOIN contribuintes co ON co.id = c.contribuinte_id
-            WHERE co.usuario_id = ? AND c.status = 'transmitido'
-        ");
-        $stmt->execute([$uid]);
-        $totalTransmitidos = $stmt->fetchColumn();
-
-        // Últimas competências
-        $stmt = $this->db->prepare("
-            SELECT c.*, co.razao_social, co.cnpj
-            FROM competencias c
-            JOIN contribuintes co ON co.id = c.contribuinte_id
-            WHERE co.usuario_id = ?
-            ORDER BY c.periodo DESC
-            LIMIT 5
-        ");
-        $stmt->execute([$uid]);
-        $ultimasCompetencias = $stmt->fetchAll();
-
-        // Eventos por competência (últimos 6 meses)
-        $stmt = $this->db->prepare("
-            SELECT c.periodo,
-                (SELECT COUNT(*) FROM r2010 WHERE competencia_id = c.id) as r2010,
-                (SELECT COUNT(*) FROM r2020 WHERE competencia_id = c.id) as r2020,
-                (SELECT COUNT(*) FROM r2060 WHERE competencia_id = c.id) as r2060
-            FROM competencias c
-            JOIN contribuintes co ON co.id = c.contribuinte_id
-            WHERE co.usuario_id = ?
-            ORDER BY c.periodo DESC
-            LIMIT 6
-        ");
-        $stmt->execute([$uid]);
-        $graficoDados = $stmt->fetchAll();
+        $ultimasCompetencias = $competencias->query(
+            "SELECT c.*, co.razao_social, co.cnpj FROM competencias c JOIN contribuintes co ON co.id = c.contribuinte_id WHERE co.usuario_id = ? ORDER BY c.periodo DESC LIMIT 5",
+            [$uid]
+        );
 
         $this->view('pages/dashboard', [
             'pageTitle'          => 'Dashboard',
@@ -63,7 +36,6 @@ class DashboardController extends BaseController
             'totalCompetencias'  => $totalCompetencias,
             'totalTransmitidos'  => $totalTransmitidos,
             'competencias'       => $ultimasCompetencias,
-            'graficoDados'       => $graficoDados,
             'flash'              => $this->getFlash(),
         ]);
     }

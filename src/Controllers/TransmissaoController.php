@@ -2,188 +2,102 @@
 
 namespace App\Controllers;
 
+use App\Models\CompetenciaRepository;
+use App\Models\ArquivoGeradoRepository;
+use App\Models\TransmissaoLogRepository;
 use App\Services\TransmissaoService;
 use App\Services\AssinaturaService;
-use App\Models\Database;
 
 class TransmissaoController extends BaseController
 {
+    private CompetenciaRepository $competencias;
+    private ArquivoGeradoRepository $arquivos;
+    private TransmissaoLogRepository $logs;
+
+    public function __construct(array $config)
+    {
+        parent::__construct($config);
+        $this->competencias = new CompetenciaRepository($this->db);
+        $this->arquivos     = new ArquivoGeradoRepository($this->db);
+        $this->logs         = new TransmissaoLogRepository($this->db);
+    }
+
     public function index(): void
     {
         $this->requireLogin();
-
-        $competenciaId = (int) $this->get('competencia_id', 0);
-
-        $arquivos    = [];
-        $competencia = null;
-
-        if ($competenciaId) {
-            $stmt = $this->db->prepare("SELECT * FROM arquivos_gerados WHERE competencia_id = ? ORDER BY created_at DESC");
-            $stmt->execute([$competenciaId]);
-            $arquivos = $stmt->fetchAll();
-
-            $comp = $this->db->prepare("
-                SELECT c.*, ct.cnpj, ct.razao_social
-                FROM competencias c JOIN contribuintes ct ON ct.id = c.contribuinte_id
-                WHERE c.id = ?
-            ");
-            $comp->execute([$competenciaId]);
-            $competencia = $comp->fetch();
-        }
-
-        $stmt = $this->db->prepare("
-            SELECT t.*, c.periodo, ct.cnpj, ct.razao_social
-            FROM transmissoes t
-            JOIN competencias c ON c.id = t.competencia_id
-            JOIN contribuintes ct ON ct.id = c.contribuinte_id
-            ORDER BY t.created_at DESC
-            LIMIT 50
-        ");
-        $stmt->execute();
-        $historico = $stmt->fetchAll();
-
-        $certInfo = (new AssinaturaService())->infoCertificado();
+        $compId      = (int) $this->get('competencia_id');
+        $competencia = $compId ? $this->competencias->findWithContribuinte($compId, $this->userId()) : null;
 
         $this->view('pages/transmissao/index', [
-            'pageTitle'      => 'Transmissão SEFAZ',
-            'competencia'    => $competencia,
-            'arquivos'       => $arquivos,
-            'historico'      => $historico,
-            'certInfo'       => $certInfo,
-            'competenciaId'  => $competenciaId,
+            'pageTitle'     => 'Transmissão SEFAZ',
+            'competencia'   => $competencia,
+            'arquivos'      => $compId ? $this->arquivos->listByCompetencia($compId) : [],
+            'historico'     => $this->logs->historico(),
+            'certInfo'      => (new AssinaturaService())->infoCertificado(),
+            'competenciaId' => $compId,
         ]);
     }
 
     public function enviar(): void
     {
         $this->requireLogin();
+        $compId     = (int) $this->post('competencia_id');
+        $arquivoIds = $this->post('arquivos') ?? [];
+        $url        = "/transmissao?competencia_id={$compId}";
 
-        $competenciaId = (int) $this->post('competencia_id', 0);
-        $arquivoIds    = $_POST['arquivos'] ?? [];
-
-        if (!$competenciaId || empty($arquivoIds)) {
-            $this->redirect("/transmissao?competencia_id={$competenciaId}", 'Selecione ao menos um arquivo para enviar.', 'error');
+        if (!$compId || empty($arquivoIds)) {
+            $this->redirect($url, 'Selecione ao menos um arquivo.', 'erro');
         }
 
-        $comp = $this->db->prepare("
-            SELECT c.*, ct.cnpj, ct.razao_social
-            FROM competencias c JOIN contribuintes ct ON ct.id = c.contribuinte_id
-            WHERE c.id = ?
-        ");
-        $comp->execute([$competenciaId]);
-        $competencia = $comp->fetch();
-
-        if (!$competencia) {
-            $this->redirect('/transmissao', 'Competência não encontrada.', 'error');
+        $comp = $this->competencias->findWithContribuinte($compId, $this->userId());
+        if (!$comp) {
+            $this->redirect('/transmissao', 'Competência não encontrada.', 'erro');
         }
 
-        // Buscar XMLs
-        $placeholders = implode(',', array_fill(0, count($arquivoIds), '?'));
-        $stmt = $this->db->prepare("SELECT * FROM arquivos_gerados WHERE id IN ({$placeholders})");
-        $stmt->execute($arquivoIds);
-        $arquivos = $stmt->fetchAll();
-
-        $xmls = [];
-        foreach ($arquivos as $arq) {
-            $xml = $arq['xml_conteudo'] ?: (file_exists($arq['caminho']) ? file_get_contents($arq['caminho']) : '');
-            if ($xml) {
-                $xmls[] = $xml;
-            }
-        }
+        $arquivos = $this->arquivos->findByIds($arquivoIds);
+        $xmls     = array_filter(array_map(function ($a) {
+            return $a['xml_conteudo'] ?: (file_exists($a['caminho']) ? file_get_contents($a['caminho']) : '');
+        }, $arquivos));
 
         if (empty($xmls)) {
-            $this->redirect("/transmissao?competencia_id={$competenciaId}", 'Nenhum XML válido encontrado.', 'error');
+            $this->redirect($url, 'Nenhum XML válido.', 'erro');
         }
 
-        $service = new TransmissaoService($this->db);
-
-        // Verificar certificado — sem cert = modo simulado
+        $service   = new TransmissaoService($this->db);
         $certInfo  = (new AssinaturaService())->infoCertificado();
-        $temCert   = $certInfo['valido'] ?? false;
-        $resultado = $temCert
-            ? $service->enviarLote($competencia['cnpj'], $xmls, assinar: true)
-            : $service->enviarSimulado($competencia['cnpj'], $xmls);
+        $resultado = ($certInfo['valido'] ?? false)
+            ? $service->enviarLote($comp['cnpj'], $xmls, assinar: true)
+            : $service->enviarSimulado($comp['cnpj'], $xmls);
 
-        // Gravar log
-        $usuarioId = $_SESSION['usuario']['id'] ?? 0;
         foreach ($arquivos as $arq) {
-            $stmt = $this->db->prepare("
-                INSERT INTO transmissoes
-                    (competencia_id, usuario_id, tipo_operacao, evento, protocolo,
-                     xml_enviado, xml_retorno, codigo_retorno, descricao_retorno,
-                     sucesso, tempo_resposta_ms, ambiente)
-                VALUES (?, ?, 'envio', ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ");
-            $stmt->execute([
-                $competenciaId,
-                $usuarioId,
-                $arq['evento'] ?? '—',
-                $resultado['protocolo'] ?? '',
-                $resultado['xml_enviado'] ?? '',
-                $resultado['xml_retorno'] ?? '',
-                $resultado['codigo_retorno'] ?? '',
-                $resultado['desc_retorno'] ?? '',
-                $resultado['sucesso'] ? 1 : 0,
-                $resultado['tempo_ms'] ?? 0,
-                $resultado['ambiente'] ?? 2,
-            ]);
+            $this->logs->registrarEnvio($compId, $this->userId(), $arq['evento'] ?? '—', $resultado);
         }
 
         if ($resultado['sucesso']) {
-            $this->db->prepare("UPDATE competencias SET status = 'transmitido', data_envio = NOW(), num_recibo = ? WHERE id = ?")
-                     ->execute([$resultado['protocolo'] ?? '', $competenciaId]);
+            $this->competencias->marcarTransmitido($compId, $resultado['protocolo'] ?? '');
         }
 
-        $sim = !empty($resultado['simulado']) ? ' (modo simulação)' : '';
-        $msg = ($resultado['sucesso'] ? 'Lote enviado com sucesso' : 'Falha no envio') . $sim
-             . '. Protocolo: ' . ($resultado['protocolo'] ?? '—');
-        $tipo = $resultado['sucesso'] ? 'success' : 'error';
-
-        $this->redirect("/transmissao?competencia_id={$competenciaId}", $msg, $tipo);
+        $sim  = !empty($resultado['simulado']) ? ' (simulação)' : '';
+        $msg  = ($resultado['sucesso'] ? 'Enviado com sucesso' : 'Falha') . $sim . '. Protocolo: ' . ($resultado['protocolo'] ?? '—');
+        $this->redirect($url, $msg, $resultado['sucesso'] ? 'sucesso' : 'erro');
     }
 
     public function consultar(): void
     {
         $this->requireLogin();
-
-        $competenciaId = (int) $this->post('competencia_id', 0);
-        $protocolo     = trim($this->post('protocolo', ''));
+        $compId    = (int) $this->post('competencia_id');
+        $protocolo = trim($this->post('protocolo', ''));
+        $url       = "/transmissao?competencia_id={$compId}";
 
         if (!$protocolo) {
-            $this->redirect("/transmissao?competencia_id={$competenciaId}", 'Informe o número do protocolo.', 'error');
+            $this->redirect($url, 'Informe o protocolo.', 'erro');
         }
 
-        $comp = $this->db->prepare("
-            SELECT c.*, ct.cnpj FROM competencias c
-            JOIN contribuintes ct ON ct.id = c.contribuinte_id
-            WHERE c.id = ?
-        ");
-        $comp->execute([$competenciaId]);
-        $competencia = $comp->fetch();
+        $comp      = $this->competencias->findWithContribuinte($compId, $this->userId());
+        $resultado = (new TransmissaoService($this->db))->consultarProtocolo($comp['cnpj'] ?? '', $protocolo);
 
-        $service   = new TransmissaoService($this->db);
-        $resultado = $service->consultarProtocolo($competencia['cnpj'] ?? '', $protocolo);
+        $this->logs->registrarConsulta($compId, $this->userId(), $protocolo, $resultado, $this->config['reinf']['tp_amb'] ?? 2);
 
-        $stmt = $this->db->prepare("
-            INSERT INTO transmissoes
-                (competencia_id, usuario_id, tipo_operacao, evento, protocolo,
-                 xml_retorno, codigo_retorno, descricao_retorno,
-                 sucesso, tempo_resposta_ms, ambiente)
-            VALUES (?, ?, 'consulta', '', ?, ?, ?, ?, ?, ?, ?)
-        ");
-        $stmt->execute([
-            $competenciaId,
-            $_SESSION['usuario']['id'] ?? 0,
-            $protocolo,
-            $resultado['xml_retorno'] ?? '',
-            $resultado['codigo_retorno'] ?? '',
-            $resultado['desc_retorno'] ?? '',
-            $resultado['sucesso'] ? 1 : 0,
-            $resultado['tempo_ms'] ?? 0,
-            $this->config['reinf']['tp_amb'] ?? 2,
-        ]);
-
-        $msg = 'Consulta realizada. Retorno: ' . ($resultado['desc_retorno'] ?? '—');
-        $this->redirect("/transmissao?competencia_id={$competenciaId}", $msg, $resultado['sucesso'] ? 'success' : 'error');
+        $this->redirect($url, 'Retorno: ' . ($resultado['desc_retorno'] ?? '—'), $resultado['sucesso'] ? 'sucesso' : 'erro');
     }
 }
