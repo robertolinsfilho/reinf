@@ -56,7 +56,7 @@ class EventoController extends BaseController
         $this->getComp($cid);
 
         $this->safeExecute(function () use ($cid) {
-            $id = (int) $this->post('id', 0);
+            $id    = (int) $this->post('id', 0);
             $dados = [
                 'cnpj_prestador'         => $this->postCnpj('cnpj_prestador'),
                 'razao_social_prestador' => $this->sanitize($this->post('razao_social_prestador', '')),
@@ -69,11 +69,7 @@ class EventoController extends BaseController
             ];
 
             if ($id) {
-                $this->db->prepare("
-                    UPDATE r2010 SET cnpj_prestador=?, razao_social_prestador=?, tipo_insc_prestador=?,
-                    num_documento=?, data_emissao=?, valor_bruto=?, valor_retencao=?, valor_desc_senar=?
-                    WHERE id=? AND competencia_id=?
-                ")->execute([...array_values($dados), $id, $cid]);
+                $this->eventos->atualizar('r2010', $id, $cid, $dados);
             } else {
                 $this->eventos->inserir('r2010', ['competencia_id' => $cid, ...$dados]);
             }
@@ -208,16 +204,16 @@ class EventoController extends BaseController
 
         $this->safeExecute(function () use ($cid) {
             $this->eventos->inserir('r4010', [
-                'competencia_id'       => $cid,
-                'cpf_beneficiario'     => $this->postCpf('cpf_beneficiario'),
-                'nome_beneficiario'    => $this->sanitize($this->post('nome_beneficiario', '')),
-                'natureza_rendimento'  => $this->post('natureza_rendimento', ''),
-                'data_pagamento'       => $this->post('data_pagamento', date('Y-m-d')),
-                'valor_bruto'          => $this->postMoney('valor_bruto'),
-                'valor_ir'             => $this->postMoney('valor_ir'),
-                'valor_base_ir'        => $this->postMoney('valor_base_ir'),
-                'valor_deducao'        => $this->postMoney('valor_deducao'),
-                'descricao_pagamento'  => $this->sanitize($this->post('descricao_pagamento', '')),
+                'competencia_id'      => $cid,
+                'cpf_beneficiario'    => $this->postCpf('cpf_beneficiario'),
+                'nome_beneficiario'   => $this->sanitize($this->post('nome_beneficiario', '')),
+                'natureza_rendimento' => $this->post('natureza_rendimento', ''),
+                'data_pagamento'      => $this->post('data_pagamento', date('Y-m-d')),
+                'valor_bruto'         => $this->postMoney('valor_bruto'),
+                'valor_ir'            => $this->postMoney('valor_ir'),
+                'valor_base_ir'       => $this->postMoney('valor_base_ir'),
+                'valor_deducao'       => $this->postMoney('valor_deducao'),
+                'descricao_pagamento' => $this->sanitize($this->post('descricao_pagamento', '')),
             ]);
             $this->redirect("/eventos/r4010?competencia_id={$cid}", 'Pagamento PF adicionado!', 'sucesso');
         }, "/eventos/r4010?competencia_id={$cid}");

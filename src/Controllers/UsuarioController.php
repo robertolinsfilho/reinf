@@ -2,77 +2,85 @@
 
 namespace App\Controllers;
 
+use App\Models\UsuarioRepository;
+
 class UsuarioController extends BaseController
 {
+    private UsuarioRepository $repo;
+
+    public function __construct(array $config)
+    {
+        parent::__construct($config);
+        $this->repo = new UsuarioRepository($this->db);
+    }
+
     public function index(): void
     {
         $this->requireAdmin();
-        $stmt = $this->db->query("SELECT id, nome, email, perfil, ativo, trial_expira, created_at FROM usuarios ORDER BY nome");
-        $usuarios = $stmt->fetchAll();
-        $this->view('pages/usuarios/index', ['pageTitle' => 'Usuários', 'usuarios' => $usuarios, 'flash' => $this->getFlash()]);
+        $this->view('pages/usuarios/index', [
+            'pageTitle' => 'Usuários',
+            'usuarios'  => $this->repo->listAll(),
+            'flash'     => $this->getFlash(),
+        ]);
     }
 
     public function novo(): void
     {
         $this->requireAdmin();
-        $this->view('pages/usuarios/form', ['pageTitle' => 'Novo Usuário', 'usuario' => null, 'flash' => $this->getFlash()]);
+        $this->view('pages/usuarios/form', [
+            'pageTitle' => 'Novo Usuário',
+            'usuario'   => null,
+            'flash'     => $this->getFlash(),
+        ]);
     }
 
     public function salvar(): void
     {
         $this->requireAdmin();
-        $nome         = $this->sanitize($this->post('nome', ''));
-        $email        = $this->sanitize($this->post('email', ''));
-        $senha        = $this->post('senha', '');
-        $perfil       = $this->post('perfil', 'usuario');
-        $trialExpira  = $this->post('trial_expira', null) ?: null;
+        $nome  = $this->sanitize($this->post('nome', ''));
+        $email = $this->sanitize($this->post('email', ''));
+        $senha = $this->post('senha', '');
 
         if (!$nome || !$email || !$senha) {
-            $this->flash('erro', 'Nome, e-mail e senha são obrigatórios.');
-            $this->redirect('/usuarios/novo');
+            $this->redirect('/usuarios/novo', 'Nome, e-mail e senha são obrigatórios.', 'erro');
         }
 
-        $hash = password_hash($senha, PASSWORD_BCRYPT);
-        $stmt = $this->db->prepare("INSERT INTO usuarios (nome, email, senha, perfil, trial_expira) VALUES (?,?,?,?,?)");
-        $stmt->execute([$nome, $email, $hash, $perfil, $trialExpira]);
-
-        $this->flash('sucesso', 'Usuário criado com sucesso!');
-        $this->redirect('/usuarios');
+        $this->safeExecute(function () use ($nome, $email, $senha) {
+            $this->repo->criar(
+                $nome,
+                $email,
+                password_hash($senha, PASSWORD_BCRYPT),
+                $this->post('perfil', 'usuario'),
+                $this->post('trial_expira') ?: null
+            );
+            $this->redirect('/usuarios', 'Usuário criado!', 'sucesso');
+        }, '/usuarios/novo');
     }
 
     public function perfil(): void
     {
         $this->requireLogin();
-        $uid  = $_SESSION['usuario']['id'];
-        $stmt = $this->db->prepare("SELECT id, nome, email FROM usuarios WHERE id = ?");
-        $stmt->execute([$uid]);
-        $usuario = $stmt->fetch();
-        $this->view('pages/usuarios/perfil', ['pageTitle' => 'Meu Perfil', 'usuario' => $usuario, 'flash' => $this->getFlash()]);
+        $this->view('pages/usuarios/perfil', [
+            'pageTitle' => 'Meu Perfil',
+            'usuario'   => $this->repo->find($this->userId()),
+            'flash'     => $this->getFlash(),
+        ]);
     }
 
     public function salvarPerfil(): void
     {
         $this->requireLogin();
-        $uid  = $_SESSION['usuario']['id'];
-        $nome = $this->sanitize($this->post('nome', ''));
+        $nome  = $this->sanitize($this->post('nome', ''));
         $senha = $this->post('senha', '');
 
         if (!$nome) {
-            $this->flash('erro', 'Nome é obrigatório.');
-            $this->redirect('/perfil');
+            $this->redirect('/perfil', 'Nome é obrigatório.', 'erro');
         }
 
-        if ($senha) {
-            $hash = password_hash($senha, PASSWORD_BCRYPT);
-            $stmt = $this->db->prepare("UPDATE usuarios SET nome=?, senha=? WHERE id=?");
-            $stmt->execute([$nome, $hash, $uid]);
-        } else {
-            $stmt = $this->db->prepare("UPDATE usuarios SET nome=? WHERE id=?");
-            $stmt->execute([$nome, $uid]);
-        }
+        $hash = $senha ? password_hash($senha, PASSWORD_BCRYPT) : null;
+        $this->repo->atualizarPerfil($this->userId(), $nome, $hash);
 
         $_SESSION['usuario']['nome'] = $nome;
-        $this->flash('sucesso', 'Perfil atualizado!');
-        $this->redirect('/perfil');
+        $this->redirect('/perfil', 'Perfil atualizado!', 'sucesso');
     }
 }
