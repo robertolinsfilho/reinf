@@ -15,7 +15,9 @@ class CompetenciaController extends BaseController
             SELECT c.*, co.razao_social, co.cnpj,
                 (SELECT COUNT(*) FROM r2010 WHERE competencia_id = c.id) as total_r2010,
                 (SELECT COUNT(*) FROM r2020 WHERE competencia_id = c.id) as total_r2020,
-                (SELECT COUNT(*) FROM r2060 WHERE competencia_id = c.id) as total_r2060
+                (SELECT COUNT(*) FROM r2060 WHERE competencia_id = c.id) as total_r2060,
+                (SELECT COUNT(*) FROM r4010 WHERE competencia_id = c.id) as total_r4010,
+                (SELECT COUNT(*) FROM r4020 WHERE competencia_id = c.id) as total_r4020
             FROM competencias c
             JOIN contribuintes co ON co.id = c.contribuinte_id
             WHERE co.usuario_id = ?

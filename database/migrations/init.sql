@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS usuarios (
     senha VARCHAR(255) NOT NULL,
     perfil ENUM('admin','usuario') DEFAULT 'usuario',
     ativo TINYINT(1) DEFAULT 1,
+    trial_expira DATE NULL,
     ultimo_acesso DATETIME NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP

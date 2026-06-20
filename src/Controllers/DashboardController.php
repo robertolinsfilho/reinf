@@ -62,7 +62,7 @@ class DashboardController extends BaseController
             'totalContribuintes' => $totalContribuintes,
             'totalCompetencias'  => $totalCompetencias,
             'totalTransmitidos'  => $totalTransmitidos,
-            'ultimasCompetencias'=> $ultimasCompetencias,
+            'competencias'       => $ultimasCompetencias,
             'graficoDados'       => $graficoDados,
             'flash'              => $this->getFlash(),
         ]);

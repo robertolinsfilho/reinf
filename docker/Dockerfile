@@ -1,6 +1,5 @@
 FROM php:8.2-fpm
 
-# Instalar dependências do sistema
 RUN apt-get update && apt-get install -y \
     git \
     curl \
@@ -8,28 +7,29 @@ RUN apt-get update && apt-get install -y \
     libonig-dev \
     libxml2-dev \
     libzip-dev \
+    libssl-dev \
+    libcurl4-openssl-dev \
     zip \
     unzip \
-    libssl-dev \
-    && docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd zip \
+    && docker-php-ext-install \
+        pdo_mysql mbstring exif pcntl bcmath gd zip \
+        soap dom curl openssl \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Instalar Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-# Diretório de trabalho
 WORKDIR /var/www/html
 
-# Copiar arquivos
 COPY . .
 
-# Instalar dependências PHP
 RUN composer install --no-dev --optimize-autoloader
 
-# Permissões
-RUN chown -R www-data:www-data /var/www/html \
-    && chmod -R 755 /var/www/html/public/uploads
+RUN mkdir -p /var/www/html/public/uploads/xml \
+    && mkdir -p /var/www/html/storage/certs \
+    && chown -R www-data:www-data /var/www/html \
+    && chmod -R 775 /var/www/html/public/uploads \
+    && chmod -R 775 /var/www/html/storage
 
 EXPOSE 9000
 
