@@ -143,7 +143,7 @@ abstract class BaseController
             $fn();
         } catch (\PDOException $e) {
             error_log("DB Error: " . $e->getMessage());
-            $this->redirect($redirectUrl, "{$errorPrefix}: Erro no banco de dados.", 'erro');
+            $this->redirect($redirectUrl, "{$errorPrefix}: " . $e->getMessage(), 'erro');
         } catch (\Exception $e) {
             error_log("Error: " . $e->getMessage());
             $this->redirect($redirectUrl, "{$errorPrefix}: " . $e->getMessage(), 'erro');

@@ -180,7 +180,7 @@ class GeracaoXmlService
             $nfsXml = '';
             foreach ($nfs as $nf) {
                 $nfsXml .= "                    <nfs>\n"
-                         . "                        <serie>" . htmlspecialchars($nf['serie'] ?: '1') . "</serie>\n"
+                         . "                        <serie>" . htmlspecialchars($nf['serie'] ?? '1') . "</serie>\n"
                          . "                        <numDocto>" . htmlspecialchars($nf['num_documento'] ?: '1') . "</numDocto>\n"
                          . "                        <dtEmissaoNF>" . ($nf['data_emissao'] ?: date('Y-m-d')) . "</dtEmissaoNF>\n"
                          . "                        <vlrBruto>" . $this->fmtVal($nf['valor_bruto']) . "</vlrBruto>\n"
@@ -249,7 +249,7 @@ class GeracaoXmlService
             $nfsXml = '';
             foreach ($nfs as $nf) {
                 $nfsXml .= "                    <nfs>\n"
-                         . "                        <serie>" . htmlspecialchars($nf['serie'] ?: '1') . "</serie>\n"
+                         . "                        <serie>" . htmlspecialchars($nf['serie'] ?? '1') . "</serie>\n"
                          . "                        <numDocto>" . htmlspecialchars($nf['num_documento'] ?: '1') . "</numDocto>\n"
                          . "                        <dtEmissaoNF>" . ($nf['data_emissao'] ?: date('Y-m-d')) . "</dtEmissaoNF>\n"
                          . "                        <vlrBruto>" . $this->fmtVal($nf['valor_bruto']) . "</vlrBruto>\n"
