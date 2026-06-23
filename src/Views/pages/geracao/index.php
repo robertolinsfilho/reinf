@@ -60,7 +60,29 @@ if (isset($_SESSION['flash'])) { $flash = $_SESSION['flash']; unset($_SESSION['f
                             <?php endforeach; ?>
                         </div>
                     </div>
-
+                    <!-- Tipo: Inclusão ou Retificação -->
+                    <div class="mb-3 p-3 border rounded bg-light">
+                        <label class="form-label fw-bold mb-2">
+                            <i class="bi bi-arrow-repeat me-1"></i> Tipo de Operação
+                        </label>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="ind_retif" id="retif-1" value="1" checked onchange="document.getElementById('campo-recibo').style.display='none'">
+                            <label class="form-check-label" for="retif-1">
+                                <strong>Inclusão</strong> — primeira transmissão deste evento
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="ind_retif" id="retif-2" value="2" onchange="document.getElementById('campo-recibo').style.display='block'">
+                            <label class="form-check-label" for="retif-2">
+                                <strong>Retificação</strong> — corrigir evento já transmitido
+                            </label>
+                        </div>
+                        <div id="campo-recibo" style="display:none" class="mt-2">
+                            <label class="form-label small mb-1">Número do Recibo Original *</label>
+                            <input type="text" name="nr_recibo_original" class="form-control form-control-sm font-monospace" placeholder="Recibo da transmissão original">
+                            <div class="form-text">Informe o recibo retornado pela Receita Federal na transmissão original.</div>
+                        </div>
+                    </div>
                     <!-- Opção de assinatura -->
                     <div class="form-check form-switch mb-3 p-3 ps-5 border rounded bg-light">
                         <input class="form-check-input" type="checkbox" name="assinar" id="chk-assinar" value="1"
@@ -97,7 +119,7 @@ if (isset($_SESSION['flash'])) { $flash = $_SESSION['flash']; unset($_SESSION['f
             <div class="table-responsive">
                 <table class="table table-sm table-hover mb-0">
                     <thead>
-                        <tr><th>Evento</th><th>Arquivo</th><th>Tamanho</th><th>Assinado</th><th>Gerado em</th><th></th></tr>
+                        <tr><th>Evento</th><th>Tipo</th><th>Arquivo</th><th>Tamanho</th><th>Assinado</th><th>Gerado em</th><th></th></tr>
                     </thead>
                     <tbody>
                         <?php if (empty($arquivosGerados)): ?>
@@ -106,8 +128,17 @@ if (isset($_SESSION['flash'])) { $flash = $_SESSION['flash']; unset($_SESSION['f
                             Nenhum arquivo gerado para esta competência.
                         </td></tr>
                         <?php else: foreach ($arquivosGerados as $a): ?>
-                        <tr>
+                      <tr>
                             <td><span class="badge bg-primary"><?= $a['evento'] ?? '—' ?></span></td>
+                            <td>
+                                <?php if (($a['ind_retif'] ?? 1) == 2): ?>
+                                    <span class="badge bg-warning" title="Recibo: <?= htmlspecialchars($a['nr_recibo_original'] ?? '') ?>">
+                                        <i class="bi bi-arrow-repeat"></i> Retificação
+                                    </span>
+                                <?php else: ?>
+                                    <span class="badge bg-success">Inclusão</span>
+                                <?php endif; ?>
+                            </td>
                             <td class="font-monospace small text-primary"><?= htmlspecialchars($a['nome_arquivo']) ?></td>
                             <td class="small text-muted"><?= number_format(($a['tamanho'] ?? 0) / 1024, 1) ?> KB</td>
                             <td><?= !empty($a['assinado']) ? '<i class="bi bi-check-circle-fill text-success"></i>' : '<i class="bi bi-x-circle text-muted"></i>' ?></td>

@@ -53,13 +53,19 @@ class GeracaoController extends BaseController
     public function gerar(): void
     {
         $this->requireLogin();
-        $compId  = (int) $this->post('competencia_id');
+        $compId       = (int) $this->post('competencia_id');
         $selecionados = $this->post('eventos') ?? [];
         $assinar      = !empty($this->post('assinar'));
+        $indRetif     = (int) ($this->post('ind_retif') ?: 1);
+        $nrRecibo     = trim($this->post('nr_recibo_original', '')) ?: null;
         $url          = "/gerar?competencia_id={$compId}";
 
         if (!$compId || empty($selecionados)) {
             $this->redirect($url, 'Selecione ao menos um evento.', 'erro');
+        }
+
+        if ($indRetif === 2 && !$nrRecibo) {
+            $this->redirect($url, 'Retificação exige o número do recibo original.', 'erro');
         }
 
         $comp = $this->competencias->findWithContribuinte($compId, $this->userId());
@@ -67,8 +73,8 @@ class GeracaoController extends BaseController
             $this->redirect('/competencias', 'Competência não encontrada.', 'erro');
         }
 
-        $this->safeExecute(function () use ($comp, $compId, $selecionados, $assinar, $url) {
-            $arquivos = (new GeracaoXmlService($this->db))->gerar($comp, $selecionados);
+        $this->safeExecute(function () use ($comp, $compId, $selecionados, $assinar, $indRetif, $nrRecibo, $url) {
+            $arquivos = (new GeracaoXmlService($this->db))->gerar($comp, $selecionados, $indRetif, $nrRecibo);
 
             if ($assinar) {
                 $assinatura = new AssinaturaService();
@@ -82,11 +88,12 @@ class GeracaoController extends BaseController
             }
 
             foreach ($arquivos as $arq) {
-                $this->arquivos->salvar($compId, $this->userId(), $arq, $assinar);
+                $this->arquivos->salvar($compId, $this->userId(), $arq, $assinar, $indRetif, $nrRecibo);
             }
 
-            $qtd = count($arquivos);
-            $msg = "{$qtd} XML(s) gerado(s)" . ($assinar ? ' e assinado(s)' : '') . '!';
+            $tipo = $indRetif === 2 ? 'Retificação' : 'Inclusão';
+            $qtd  = count($arquivos);
+            $msg  = "{$qtd} XML(s) de {$tipo} gerado(s)" . ($assinar ? ' e assinado(s)' : '') . '!';
             $this->redirect($url, $msg, 'sucesso');
         }, $url, 'Erro na geração');
     }

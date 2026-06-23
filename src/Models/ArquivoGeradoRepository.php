@@ -21,18 +21,20 @@ class ArquivoGeradoRepository extends Repository
         return $this->query("SELECT * FROM arquivos_gerados WHERE id IN ({$placeholders})", $ids);
     }
 
-    public function salvar(int $competenciaId, int $userId, array $arq, bool $assinado): int
+   public function salvar(int $competenciaId, int $userId, array $arq, bool $assinado, int $indRetif = 1, ?string $nrRecibo = null): int
     {
         return $this->insert([
-            'competencia_id' => $competenciaId,
-            'usuario_id'     => $userId,
-            'evento'         => $arq['evento'],
-            'nome_arquivo'   => $arq['nome'],
-            'caminho'        => $arq['caminho'],
-            'tamanho'        => $arq['tamanho'],
-            'hash_md5'       => $arq['hash'],
-            'xml_conteudo'   => $arq['xml'],
-            'assinado'       => $assinado ? 1 : 0,
+            'competencia_id'      => $competenciaId,
+            'usuario_id'          => $userId,
+            'evento'              => $arq['evento'],
+            'nome_arquivo'        => $arq['nome'],
+            'caminho'             => $arq['caminho'],
+            'tamanho'             => $arq['tamanho'],
+            'hash_md5'            => $arq['hash'],
+            'xml_conteudo'        => $arq['xml'],
+            'assinado'            => $assinado ? 1 : 0,
+            'ind_retif'           => $indRetif,
+            'nr_recibo_original'  => $nrRecibo,
         ]);
     }
 }

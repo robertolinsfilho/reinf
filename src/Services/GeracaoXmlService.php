@@ -10,6 +10,8 @@ class GeracaoXmlService
 {
     private string $outputDir;
     private int $tpAmb;
+    private int $indRetif = 1;
+    private ?string $nrRecibo = null;
     private string $verProc;
     private int $procEmi;
 
@@ -28,9 +30,13 @@ class GeracaoXmlService
 
     // ─── Entrada pública ─────────────────────────────────────
 
-    public function gerar(array $competencia, array $eventos): array
+    public function gerar(array $competencia, array $eventos, int $indRetif = 1, ?string $nrRecibo = null): array
     {
         $arquivos = [];
+
+        // Setar contexto de retificação para uso nos métodos privados
+        $this->indRetif = $indRetif;
+        $this->nrRecibo = $nrRecibo;
 
         foreach ($eventos as $evento) {
             $xml = match ($evento) {
@@ -46,15 +52,15 @@ class GeracaoXmlService
                 default => throw new \RuntimeException("Evento {$evento} não suportado."),
             };
 
+            $sufixoRetif = $indRetif === 2 ? '_RETIF' : '';
             $nomeArq = sprintf(
-                'REINF_%s_%s_%s_%s.xml',
-                $evento,
+                'REINF_%s%s_%s_%s_%s.xml',
+                $evento, $sufixoRetif,
                 $competencia['cnpj'],
                 $competencia['periodo'],
                 date('YmdHis')
             );
             $caminho = $this->outputDir . $nomeArq;
-
             file_put_contents($caminho, $xml);
 
             $arquivos[] = [
@@ -208,7 +214,7 @@ class GeracaoXmlService
                              . "                </idePrestServ>\n";
         }
 
-        $body = "        {$this->ideEvento($comp['periodo'])}\n"
+        $body = "        {$this->ideEvento($comp['periodo'], $this->indRetif, $this->nrRecibo)}\n"
               . "        {$this->ideContri($cnpj)}\n"
               . "        <ideEstabObra>\n"
               . "            <tpInscEstab>1</tpInscEstab>\n"
@@ -278,7 +284,7 @@ class GeracaoXmlService
                            . "                </ideTomador>\n";
         }
 
-        $body = "        {$this->ideEvento($comp['periodo'])}\n"
+        $body = "        {$this->ideEvento($comp['periodo'], $this->indRetif, $this->nrRecibo)}\n"
               . "        {$this->ideContri($cnpj)}\n"
               . "        <ideEstabPrest>\n"
               . "            <tpInscEstabPrest>1</tpInscEstabPrest>\n"
@@ -319,7 +325,7 @@ class GeracaoXmlService
                             . "                </tipoCod>\n";
         }
 
-        $body = "        {$this->ideEvento($comp['periodo'])}\n"
+        $body = "        {$this->ideEvento($comp['periodo'], $this->indRetif, $this->nrRecibo)}\n"
               . "        {$this->ideContri($cnpj)}\n"
               . "        <ideEstab>\n"
               . "            <tpInscEstab>1</tpInscEstab>\n"
@@ -337,7 +343,7 @@ class GeracaoXmlService
         $cnpj = preg_replace('/\D/', '', $comp['cnpj']);
         $id   = $this->gerarId($cnpj);
 
-        $body = "        {$this->ideEvento($comp['periodo'])}\n"
+        $body = "        {$this->ideEvento($comp['periodo'], $this->indRetif, $this->nrRecibo)}\n"
               . "        {$this->ideContri($cnpj)}\n"
               . "        <ideRespInf>\n"
               . "            <nmResp>" . htmlspecialchars($comp['razao_social'] ?? '') . "</nmResp>\n"
@@ -409,7 +415,7 @@ class GeracaoXmlService
                        . "                </ideBenef>\n";
         }
 
-        $body = "        {$this->ideEvento($comp['periodo'])}\n"
+        $body = "        {$this->ideEvento($comp['periodo'], $this->indRetif, $this->nrRecibo)}\n"
               . "        {$this->ideContri($cnpj)}\n"
               . "        <ideEstab>\n"
               . "            <tpInscEstab>1</tpInscEstab>\n"
@@ -470,7 +476,7 @@ class GeracaoXmlService
                        . "                </ideBenef>\n";
         }
 
-        $body = "        {$this->ideEvento($comp['periodo'])}\n"
+        $body = "        {$this->ideEvento($comp['periodo'], $this->indRetif, $this->nrRecibo)}\n"
               . "        {$this->ideContri($cnpj)}\n"
               . "        <ideEstab>\n"
               . "            <tpInscEstab>1</tpInscEstab>\n"
@@ -488,7 +494,7 @@ class GeracaoXmlService
         $cnpj = preg_replace('/\D/', '', $comp['cnpj']);
         $id   = $this->gerarId($cnpj);
 
-        $body = "        {$this->ideEvento($comp['periodo'])}\n"
+        $body = "        {$this->ideEvento($comp['periodo'], $this->indRetif, $this->nrRecibo)}\n"
               . "        {$this->ideContri($cnpj)}\n"
               . "        <ideRespInf>\n"
               . "            <nmResp>" . htmlspecialchars($comp['razao_social'] ?? '') . "</nmResp>\n"
