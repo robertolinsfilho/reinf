@@ -66,21 +66,21 @@ abstract class Repository
         return (int) $stmt->fetchColumn();
     }
 
-    protected function query(string $sql, array $params = []): array
+    public function query(string $sql, array $params = []): array
     {
         $stmt = $this->db->prepare($sql);
         $stmt->execute($params);
         return $stmt->fetchAll();
     }
 
-    protected function queryOne(string $sql, array $params = []): ?array
+    public function queryOne(string $sql, array $params = []): ?array
     {
         $stmt = $this->db->prepare($sql);
         $stmt->execute($params);
         return $stmt->fetch() ?: null;
     }
 
-    protected function scalar(string $sql, array $params = []): mixed
+    public function scalar(string $sql, array $params = []): mixed
     {
         $stmt = $this->db->prepare($sql);
         $stmt->execute($params);
