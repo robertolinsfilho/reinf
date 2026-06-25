@@ -4,6 +4,7 @@ namespace App\Controllers;
 
 use App\Models\EventoRepository;
 use App\Models\CompetenciaRepository;
+use App\Models\NaturezaRendimentoRepository;
 
 class EventoController extends BaseController
 {
@@ -184,14 +185,17 @@ class EventoController extends BaseController
 
     // ═══ R-4010 ══════════════════════════════════════════════
 
-    public function r4010(): void
+       public function r4010(): void
     {
         $this->requireLogin();
-        $cid = (int) $this->get('competencia_id');
+        $cid       = (int) $this->get('competencia_id');
+        $naturezas = new NaturezaRendimentoRepository($this->db);
+
         $this->view('pages/eventos/r4010', [
             'pageTitle'   => 'R-4010 – Pagamentos/Créditos PF (IRRF)',
             'competencia' => $this->getComp($cid),
             'registros'   => $this->eventos->listar('r4010', $cid, 'data_pagamento DESC'),
+            'naturezas'   => $naturezas->agrupadoPorTipo('pf'),
             'flash'       => $this->getFlash(),
         ]);
     }
@@ -234,11 +238,14 @@ class EventoController extends BaseController
     public function r4020(): void
     {
         $this->requireLogin();
-        $cid = (int) $this->get('competencia_id');
+        $cid       = (int) $this->get('competencia_id');
+        $naturezas = new NaturezaRendimentoRepository($this->db);
+
         $this->view('pages/eventos/r4020', [
             'pageTitle'   => 'R-4020 – Pagamentos/Créditos PJ',
             'competencia' => $this->getComp($cid),
             'registros'   => $this->eventos->listar('r4020', $cid, 'data_pagamento DESC'),
+            'naturezas'   => $naturezas->agrupadoPorTipo('pj'),
             'flash'       => $this->getFlash(),
         ]);
     }

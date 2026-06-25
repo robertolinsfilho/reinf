@@ -31,20 +31,17 @@
                     <div class="row g-2 mb-2">
                         <div class="col-6">
                             <label class="form-label">Natureza Rendimento *</label>
-                            <select name="natureza_rendimento" class="form-select form-select-sm" required>
-                                <option value="">Selecione...</option>
-                                <option value="10001">10001 – Salários</option>
-                                <option value="10002">10002 – Férias</option>
-                                <option value="10003">10003 – Serviços sem vínculo</option>
-                                <option value="10004">10004 – Comissões/corretagens</option>
-                                <option value="10006">10006 – 13º Salário</option>
-                                <option value="10008">10008 – PLR</option>
-                                <option value="10009">10009 – RRA</option>
-                                <option value="12001">12001 – Pró-labore</option>
-                                <option value="12004">12004 – Distribuição de lucros</option>
-                                <option value="12010">12010 – Remuneração por serviços</option>
-                                <option value="12040">12040 – Aluguéis</option>
-                                <option value="12051">12051 – Serviços profissionais</option>
+                            <<select name="natureza_rendimento" class="form-select form-select-sm" required>
+                                <option value="">Selecione a natureza...</option>
+                                <?php foreach (($naturezas ?? []) as $grupo => $items): ?>
+                                <optgroup label="<?= htmlspecialchars($grupo) ?>">
+                                    <?php foreach ($items as $n): ?>
+                                    <option value="<?= $n['codigo'] ?>">
+                                        <?= $n['codigo'] ?> – <?= htmlspecialchars($n['descricao']) ?>
+                                    </option>
+                                    <?php endforeach; ?>
+                                </optgroup>
+                                <?php endforeach; ?>
                             </select>
                         </div>
                         <div class="col-6">
