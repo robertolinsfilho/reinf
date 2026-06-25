@@ -27,6 +27,9 @@
         <a href="/competencias" class="nav-item <?= str_contains($_SERVER['REQUEST_URI'], 'competencia') ? 'active' : '' ?>">
             <i class="bi bi-calendar3"></i> Competências
         </a>
+        <a href="/processos" class="nav-item <?= str_contains($_SERVER['REQUEST_URI'], 'processo') ? 'active' : '' ?>">
+            <i class="bi bi-folder2-open"></i> R-1070 Processos
+        </a>
 
         <div class="nav-label">PREVIDÊNCIA (INSS)</div>
         <a href="/eventos/r2010" class="nav-item sub <?= str_contains($_SERVER['REQUEST_URI'], 'r2010') ? 'active' : '' ?>">
@@ -59,6 +62,11 @@
         </a>
         <a href="/certificados" class="nav-item <?= str_contains($_SERVER['REQUEST_URI'], 'certificado') ? 'active' : '' ?>">
             <i class="bi bi-shield-lock"></i> Certificado A1
+        </a>
+
+        <div class="nav-label">CONSULTAS</div>
+        <a href="/naturezas" class="nav-item <?= str_contains($_SERVER['REQUEST_URI'], 'naturezas') ? 'active' : '' ?>">
+            <i class="bi bi-tags"></i> Naturezas de Rendimento
         </a>
 
         <?php if (($usuario['perfil'] ?? '') === 'admin'): ?>
