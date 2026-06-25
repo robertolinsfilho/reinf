@@ -41,6 +41,7 @@ class GeracaoXmlService
         foreach ($eventos as $evento) {
             $xml = match ($evento) {
                 'R1000' => $this->gerarR1000($competencia),
+                'R1070' => $this->gerarR1070($competencia),
                 'R2010' => $this->gerarR2010($competencia),
                 'R2020' => $this->gerarR2020($competencia),
                 'R2060' => $this->gerarR2060($competencia),
@@ -153,6 +154,62 @@ class GeracaoXmlService
               . "        </infoContri>";
 
         return $this->envelope('evtInfoContribuinte', 'evtInfoContribuinte', $id, $body);
+    }
+
+      private function gerarR1070(array $comp): string
+    {
+        $cnpj = preg_replace('/\D/', '', $comp['cnpj']);
+        $id   = $this->gerarId($cnpj);
+
+        $stmt = $this->db->prepare("SELECT * FROM r1070_processos WHERE contribuinte_id = ? AND status = 'ativo' ORDER BY data_inclusao");
+        $stmt->execute([$comp['contribuinte_id']]);
+        $processos = $stmt->fetchAll();
+
+        if (empty($processos)) {
+            throw new \RuntimeException("Nenhum processo cadastrado para o contribuinte.");
+        }
+
+        $processosXml = '';
+        foreach ($processos as $p) {
+            $processosXml .= "            <inclusao>\n"
+                           . "                <idePeriodo>\n"
+                           . "                    <iniValid>{$comp['periodo']}</iniValid>\n"
+                           . "                </idePeriodo>\n"
+                           . "                <ideProcesso>\n"
+                           . "                    <tpProc>{$p['tipo_processo']}</tpProc>\n"
+                           . "                    <nrProc>" . htmlspecialchars($p['numero_processo']) . "</nrProc>\n";
+
+            if ($p['tipo_processo'] == 2) {
+                $processosXml .= "                    <indAutoria>" . ($p['indicador_autoria'] ?? 1) . "</indAutoria>\n";
+                if ($p['uf_vara']) {
+                    $processosXml .= "                    <ufVara>{$p['uf_vara']}</ufVara>\n";
+                }
+                if ($p['cod_municipio']) {
+                    $processosXml .= "                    <codMunic>{$p['cod_municipio']}</codMunic>\n";
+                }
+                if ($p['id_vara']) {
+                    $processosXml .= "                    <idVara>{$p['id_vara']}</idVara>\n";
+                }
+            }
+
+            $processosXml .= "                </ideProcesso>\n"
+                           . "                <infoSusp>\n"
+                           . "                    <indSusp>" . ($p['indicador_susp_exig'] ?? 0) . "</indSusp>\n";
+            if ($p['data_decisao']) {
+                $processosXml .= "                    <dtDecisao>{$p['data_decisao']}</dtDecisao>\n";
+            }
+            $processosXml .= "                    <indDeposito>" . ($p['indicador_deposito'] ?? 0) . "</indDeposito>\n"
+                           . "                </infoSusp>\n"
+                           . "            </inclusao>\n";
+        }
+
+        $body = "        {$this->ideEvento($comp['periodo'], $this->indRetif, $this->nrRecibo)}\n"
+              . "        {$this->ideContri($cnpj)}\n"
+              . "        <infoProcesso>\n"
+              . $processosXml
+              . "        </infoProcesso>";
+
+        return $this->envelope('evtTabProcesso', 'evtTabProcesso', $id, $body);
     }
 
     // ─── R-2010 · Retenção INSS Serviços Tomados ─────────────

@@ -31,7 +31,7 @@
                     <div class="row g-2 mb-2">
                         <div class="col-6">
                             <label class="form-label">Natureza Rendimento *</label>
-                            <<select name="natureza_rendimento" class="form-select form-select-sm" required>
+                            <select name="natureza_rendimento" class="form-select form-select-sm" required>
                                 <option value="">Selecione a natureza...</option>
                                 <?php foreach (($naturezas ?? []) as $grupo => $items): ?>
                                 <optgroup label="<?= htmlspecialchars($grupo) ?>">

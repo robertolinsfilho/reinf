@@ -30,6 +30,7 @@ if (isset($_SESSION['flash'])) { $flash = $_SESSION['flash']; unset($_SESSION['f
                             <?php
                             $eventosList = [
                                 'R1000' => ['R-1000 – Informações do Contribuinte', 'bi-building', true],
+                                'R1070' => ['R-1070 – Processos Admin./Judiciais', 'bi-folder2-open', true],
                                 'R2010' => ['R-2010 – Retenções INSS (Tomados)', 'bi-arrow-down-left-circle', $eventosDisponiveis['R2010'] ?? false],
                                 'R2020' => ['R-2020 – Retenções INSS (Prestados)', 'bi-arrow-up-right-circle', $eventosDisponiveis['R2020'] ?? false],
                                 'R2060' => ['R-2060 – CPRB', 'bi-calculator', $eventosDisponiveis['R2060'] ?? false],
@@ -40,7 +41,7 @@ if (isset($_SESSION['flash'])) { $flash = $_SESSION['flash']; unset($_SESSION['f
                                 'R9000' => ['R-9000 – Exclusão de Evento', 'bi-trash', true],
                             ];
                             foreach ($eventosList as $cod => [$desc, $icon, $temDados]):
-                                $disabled = !$temDados && !in_array($cod, ['R1000','R2099','R4099','R9000']);
+                                $disabled = !$temDados && !in_array($cod, ['R1000','R1070','R2099','R4099','R9000']);
                             ?>
                             <div class="form-check border rounded p-3 ps-5 <?= $disabled ? 'opacity-50' : '' ?>" style="cursor:<?= $disabled ? 'not-allowed' : 'pointer' ?>">
                                 <input class="form-check-input" type="checkbox" name="eventos[]"

@@ -32,7 +32,10 @@ $routes = [
         '/contribuintes/novo'    => ['App\\Controllers\\ContribuinteController', 'novo'],
         '/contribuintes/editar'  => ['App\\Controllers\\ContribuinteController', 'editar'],
         '/contribuintes/excluir' => ['App\\Controllers\\ContribuinteController', 'excluir'],
-
+        '/processos'             => ['App\\Controllers\\ProcessoController', 'index'],
+        '/processos/novo'        => ['App\\Controllers\\ProcessoController', 'novo'],
+        '/processos/editar'      => ['App\\Controllers\\ProcessoController', 'editar'],
+        '/processos/excluir'     => ['App\\Controllers\\ProcessoController', 'excluir'],
         // Competências
         '/competencias'          => ['App\\Controllers\\CompetenciaController', 'index'],
         '/competencias/nova'     => ['App\\Controllers\\CompetenciaController', 'nova'],
@@ -70,6 +73,7 @@ $routes = [
         '/login'                    => ['App\\Controllers\\AuthController', 'login'],
         '/contribuintes/salvar'     => ['App\\Controllers\\ContribuinteController', 'salvar'],
         '/competencias/salvar'      => ['App\\Controllers\\CompetenciaController', 'salvar'],
+        '/processos/salvar'      => ['App\\Controllers\\ProcessoController', 'salvar'],
 
         // Eventos R-2000
         '/eventos/r2010/salvar'     => ['App\\Controllers\\EventoController', 'salvarR2010'],
