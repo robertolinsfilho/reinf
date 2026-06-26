@@ -26,7 +26,8 @@ $routes = [
         '/login'                 => ['App\\Controllers\\AuthController', 'loginForm'],
         '/logout'                => ['App\\Controllers\\AuthController', 'logout'],
         '/dashboard'             => ['App\\Controllers\\DashboardController', 'index'],
-
+        '/gerar/validar'         => ['App\\Controllers\\GeracaoController', 'validar'],
+        '/gerar/xsd'             => ['App\\Controllers\\GeracaoController', 'statusXsd'],
         // Contribuintes
         '/contribuintes'         => ['App\\Controllers\\ContribuinteController', 'index'],
         '/contribuintes/novo'    => ['App\\Controllers\\ContribuinteController', 'novo'],

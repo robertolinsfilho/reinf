@@ -7,6 +7,8 @@ use App\Models\EventoRepository;
 use App\Models\ArquivoGeradoRepository;
 use App\Services\GeracaoXmlService;
 use App\Services\AssinaturaService;
+use App\Services\ValidacaoXmlService;
+
 
 class GeracaoController extends BaseController
 {
