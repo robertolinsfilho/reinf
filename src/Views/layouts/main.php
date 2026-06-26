@@ -57,6 +57,9 @@
         <a href="/gerar" class="nav-item <?= str_contains($_SERVER['REQUEST_URI'], 'gerar') ? 'active' : '' ?>">
             <i class="bi bi-file-earmark-code"></i> Gerar XML
         </a>
+        <a href="/gerar/xsd" class="nav-item sub <?= str_contains($_SERVER['REQUEST_URI'], '/gerar/xsd') ? 'active' : '' ?>">
+            <i class="bi bi-arrow-right-short"></i> Status XSDs
+        </a>
         <a href="/transmissao" class="nav-item <?= str_contains($_SERVER['REQUEST_URI'], 'transmissao') ? 'active' : '' ?>">
             <i class="bi bi-send"></i> Transmissão
         </a>
