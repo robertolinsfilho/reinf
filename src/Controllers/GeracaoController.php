@@ -9,7 +9,6 @@ use App\Services\GeracaoXmlService;
 use App\Services\AssinaturaService;
 use App\Services\ValidacaoXmlService;
 
-
 class GeracaoController extends BaseController
 {
     private CompetenciaRepository $competencias;
@@ -38,7 +37,7 @@ class GeracaoController extends BaseController
             $this->redirect('/competencias', 'Competência não encontrada.', 'erro');
         }
 
-        $disponiveis = ['R1000' => true];
+        $disponiveis = ['R1000' => true, 'R1070' => true];
         foreach (['R2010'=>'r2010','R2020'=>'r2020','R2060'=>'r2060','R4010'=>'r4010','R4020'=>'r4020'] as $evt => $tab) {
             $disponiveis[$evt] = $this->eventos->contar($tab, $compId) > 0;
         }
@@ -60,6 +59,7 @@ class GeracaoController extends BaseController
         $assinar      = !empty($this->post('assinar'));
         $indRetif     = (int) ($this->post('ind_retif') ?: 1);
         $nrRecibo     = trim($this->post('nr_recibo_original', '')) ?: null;
+        $forcar       = !empty($this->post('forcar'));
         $url          = "/gerar?competencia_id={$compId}";
 
         if (!$compId || empty($selecionados)) {
@@ -75,9 +75,31 @@ class GeracaoController extends BaseController
             $this->redirect('/competencias', 'Competência não encontrada.', 'erro');
         }
 
-        $this->safeExecute(function () use ($comp, $compId, $selecionados, $assinar, $indRetif, $nrRecibo, $url) {
+        $this->safeExecute(function () use ($comp, $compId, $selecionados, $assinar, $indRetif, $nrRecibo, $forcar, $url) {
             $arquivos = (new GeracaoXmlService($this->db))->gerar($comp, $selecionados, $indRetif, $nrRecibo);
 
+            // Validar contra XSD
+            $validador = new ValidacaoXmlService();
+            $validacao = $validador->validarLote(array_map(fn($a) => [
+                'evento' => $a['evento'],
+                'xml'    => $a['xml'],
+                'nome'   => $a['nome'],
+            ], $arquivos));
+
+            // Se houver erro de validação e não estiver em modo "forçar", mostra tela de validação
+            if (!$validacao['todos_validos'] && !$forcar) {
+                $_SESSION['validacao_pendente'] = [
+                    'competencia_id'     => $compId,
+                    'eventos'            => $selecionados,
+                    'assinar'            => $assinar,
+                    'ind_retif'          => $indRetif,
+                    'nr_recibo_original' => $nrRecibo,
+                    'resultado'          => $validacao,
+                ];
+                $this->redirect("/gerar/validar?competencia_id={$compId}");
+            }
+
+            // Assinar se solicitado
             if ($assinar) {
                 $assinatura = new AssinaturaService();
                 foreach ($arquivos as &$arq) {
@@ -89,15 +111,53 @@ class GeracaoController extends BaseController
                 unset($arq);
             }
 
+            // Salvar no banco
             foreach ($arquivos as $arq) {
                 $this->arquivos->salvar($compId, $this->userId(), $arq, $assinar, $indRetif, $nrRecibo);
             }
 
-            $tipo = $indRetif === 2 ? 'Retificação' : 'Inclusão';
-            $qtd  = count($arquivos);
-            $msg  = "{$qtd} XML(s) de {$tipo} gerado(s)" . ($assinar ? ' e assinado(s)' : '') . '!';
+            unset($_SESSION['validacao_pendente']);
+
+            $tipo  = $indRetif === 2 ? 'Retificação' : 'Inclusão';
+            $qtd   = count($arquivos);
+            $aviso = $validacao['tem_aviso'] ? ' (validação parcial — alguns XSDs não instalados)' : '';
+            $msg   = "{$qtd} XML(s) de {$tipo} gerado(s)" . ($assinar ? ' e assinado(s)' : '') . "{$aviso}!";
             $this->redirect($url, $msg, 'sucesso');
         }, $url, 'Erro na geração');
+    }
+
+    /**
+     * Tela de revisão quando a validação XSD falha.
+     */
+    public function validar(): void
+    {
+        $this->requireLogin();
+        $compId   = (int) $this->get('competencia_id');
+        $pendente = $_SESSION['validacao_pendente'] ?? null;
+
+        if (!$pendente) {
+            $this->redirect("/gerar?competencia_id={$compId}", 'Nenhuma validação pendente.', 'erro');
+        }
+
+        $this->view('pages/geracao/validar', [
+            'pageTitle'     => 'Validação XSD',
+            'resultado'     => $pendente['resultado'],
+            'pendente'      => $pendente,
+            'competenciaId' => $compId,
+        ]);
+    }
+
+    /**
+     * Tela de status dos XSDs instalados.
+     */
+    public function statusXsd(): void
+    {
+        $this->requireLogin();
+        $validador = new ValidacaoXmlService();
+        $this->view('pages/geracao/xsd', [
+            'pageTitle' => 'Status dos Schemas XSD',
+            'status'    => $validador->statusXsds(),
+        ]);
     }
 
     public function download(): void
