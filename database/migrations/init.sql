@@ -225,8 +225,10 @@ CREATE TABLE IF NOT EXISTS arquivos_gerados (
     INDEX idx_arq_comp (competencia_id)
 ) ENGINE=InnoDB;
 
--- Seed admin (senha: admin123)
-INSERT INTO usuarios (nome, email, senha, perfil) VALUES
+-- Seed do administrador
+-- E-mail: admin@efdreinf.com.br
+-- Senha: admin123
+INSERT INTO usuarios (nome, email, senha, perfil, ativo) VALUES
 ('Administrador', 'admin@efdreinf.com.br',
- '$2y$12$LnFwWFQBQMmCbVJ3YyLHNO7pJQNQQqjqMqVfUwLwT.j3IKA6tXYuO',
- 'admin');
+ '$2y$10$i7YbP/ylBPLklB6sh..fqO.kHgA7o8vKHVinZOa9fvbnmAqSzT5Oi',
+ 'admin', 1);
