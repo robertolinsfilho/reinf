@@ -90,8 +90,11 @@
                     A=CPF, B=Nome, C=Natureza, D=Data Pagto, E=Bruto, F=Base IR, G=IR, H=Dedução
                 </div>
                 <div class="mb-0">
-                    <strong class="text-primary">R-4020:</strong>
-                    A=CNPJ, B=Razão Social, C=Natureza, D=Data Pagto, E=Bruto, F=Base IR, G=IR, H=CSLL, I=COFINS, J=PIS
+                    <strong class="text-primary">R-4020 (formato oficial RFB):</strong>
+                    A=CNPJ Contribuinte, B=CNPJ Prestador, C=Nº NFS, D=Período Apuração,
+                    E=Data Fato Gerador, F=Valor Bruto, G=Cód Tipo Serviço (Tab 4020), H=Cód País,
+                    I=Base Cálculo, J=IRRF, K=CSRF, L=CSLL, M=PIS, N=COFINS,
+                    O=Identificador, P-R=FCI/SCP, S=Judicial, T=Nº Processo, U=Origem, V=Observações
                 </div>
             </div>
         </div>

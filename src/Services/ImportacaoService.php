@@ -145,47 +145,60 @@ class ImportacaoService
 
     // ─── R-4020 ──────────────────────────────────────────────
 
-    private function importarR4020(array $row, int $competenciaId): void
+   private function importarR4020(array $row, int $competenciaId): void
     {
-        // Colunas: A=CNPJ, B=Razão Social, C=Natureza, D=Data Pagto, E=Bruto, F=Base IR, G=IR, H=CSLL, I=COFINS, J=PIS
+        // Formato oficial (planilha RFB - 22 colunas):
+        // A=CNPJ Contribuinte, B=CNPJ Prestador, C=Nº NFS, D=Período Apuração,
+        // E=Data Fato Gerador, F=Valor Bruto, G=Cod Tipo Serviço, H=Cód País,
+        // I=Base Cálculo, J=IRRF, K=CSRF agregado, L=CSLL, M=PIS, N=COFINS,
+        // O=Identificador, P=Ind FCI/SCP, Q=CNPJ FCI/SCP, R=% SCP,
+        // S=Ind Judicial, T=Nº Processo, U=Ind Origem, V=Observações
+
+        $cnpjBenef = preg_replace('/\D/', '', (string)($row['B'] ?? ''));
+
+        // Pular linhas em branco
+        if (empty($cnpjBenef) || strlen($cnpjBenef) < 11) {
+            return;
+        }
+
+        $codTipoServico = str_pad(trim((string)($row['G'] ?? '')), 5, '0', STR_PAD_LEFT);
+        $natRend        = $codTipoServico; // No R-4020, natureza = cod tipo serviço da Tab 4020
+
         $stmt = $this->db->prepare("
-            INSERT INTO r4020 (competencia_id, cnpj_beneficiario, razao_social_beneficiario, natureza_rendimento,
-            data_pagamento, valor_bruto, valor_base_ir, valor_ir, valor_csll, valor_cofins, valor_pis)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO r4020 (
+                competencia_id, cnpj_contribuinte, cnpj_beneficiario, num_nfs,
+                periodo_apuracao, natureza_rendimento, cod_tipo_servico, cod_pais,
+                data_pagamento, valor_bruto, valor_base_ir, valor_ir,
+                vl_csrf_agregado, valor_csll, valor_pis, valor_cofins,
+                identificador_adicional, indicador_fci_scp, cnpj_fci_scp, percentual_scp,
+                indicador_judicial, numero_processo, indicador_origem_recurso, observacoes
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
         $stmt->execute([
             $competenciaId,
-            preg_replace('/\D/', '', $row['A'] ?? ''),
-            $row['B'] ?? '',
-            $row['C'] ?? '',
+            preg_replace('/\D/', '', (string)($row['A'] ?? '')) ?: null,
+            $cnpjBenef,
+            (string)($row['C'] ?? ''),
             $this->parseData($row['D'] ?? null),
-            $this->parseMoeda($row['E'] ?? 0),
+            $natRend,
+            $codTipoServico,
+            (string)($row['H'] ?? '') ?: null,
+            $this->parseData($row['E'] ?? null),
             $this->parseMoeda($row['F'] ?? 0),
-            $this->parseMoeda($row['G'] ?? 0),
-            $this->parseMoeda($row['H'] ?? 0),
             $this->parseMoeda($row['I'] ?? 0),
             $this->parseMoeda($row['J'] ?? 0),
+            $this->parseMoeda($row['K'] ?? 0),
+            $this->parseMoeda($row['L'] ?? 0),
+            $this->parseMoeda($row['M'] ?? 0),
+            $this->parseMoeda($row['N'] ?? 0),
+            (string)($row['O'] ?? '') ?: null,
+            !empty($row['P']) ? (int)$row['P'] : null,
+            preg_replace('/\D/', '', (string)($row['Q'] ?? '')) ?: null,
+            !empty($row['R']) ? (float)$row['R'] : null,
+            !empty($row['S']) ? 1 : 0,
+            (string)($row['T'] ?? '') ?: null,
+            !empty($row['U']) ? (int)$row['U'] : null,
+            (string)($row['V'] ?? '') ?: null,
         ]);
-    }
-
-    // ─── Helpers ─────────────────────────────────────────────
-
-    private function parseMoeda(mixed $val): float
-    {
-        if (is_numeric($val)) return (float) $val;
-        $val = str_replace(['.', ','], ['', '.'], (string) $val);
-        return (float) $val;
-    }
-
-    private function parseData(mixed $val): ?string
-    {
-        if (!$val) return null;
-        if (is_numeric($val)) {
-            // Excel serial date
-            $unix = ($val - 25569) * 86400;
-            return date('Y-m-d', (int) $unix);
-        }
-        $ts = strtotime((string) $val);
-        return $ts ? date('Y-m-d', $ts) : null;
     }
 }
