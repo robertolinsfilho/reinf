@@ -32,11 +32,10 @@ class TransmissaoService
      * @param bool   $assinar Se true, assina cada XML antes do envio
      * @return array Resultado do envio
      */
-    public function enviarLote(string $cnpj, array $xmls, bool $assinar = true): array
+     public function enviarLote(string $cnpj, array $xmls, bool $assinar = true): array
     {
         $cnpj = preg_replace('/\D/', '', $cnpj);
 
-        // Assinar cada evento se necessário
         $eventosAssinados = [];
         foreach ($xmls as $i => $xml) {
             if ($assinar) {
@@ -52,23 +51,31 @@ class TransmissaoService
             $eventosAssinados[] = $xml;
         }
 
-        // Montar o lote
-        $loteXml = $this->montarLote($cnpj, $eventosAssinados);
+        // Limite oficial: 50 eventos por lote assíncrono
+        if (count($eventosAssinados) > 50) {
+            return ['sucesso' => false, 'erro' => 'Máximo de 50 eventos por lote (limite RFB).'];
+        }
 
-        // Enviar
+        $loteXml = $this->montarLote($cnpj, $eventosAssinados);
         $url     = $this->urlEnvio[$this->tpAmb] ?? '';
         $inicio  = microtime(true);
         $retorno = $this->httpPost($url, $loteXml);
         $tempo   = (int) ((microtime(true) - $inicio) * 1000);
 
+        // No modelo assíncrono: HTTP 200 = protocolo recebido, ainda NÃO é aceitação final
+        $sucessoEnvio = in_array($retorno['http_code'], [200, 202]);
+
         return [
-            'sucesso'        => $retorno['http_code'] === 200,
+            'sucesso'        => $sucessoEnvio,
+            'assincrono'     => true,
+            'aguardando_processamento' => $sucessoEnvio,
             'http_code'      => $retorno['http_code'],
             'xml_enviado'    => $loteXml,
             'xml_retorno'    => $retorno['body'],
             'protocolo'      => $this->extrairTag($retorno['body'], 'nrProtEnvio'),
             'codigo_retorno' => $this->extrairTag($retorno['body'], 'cdRetorno'),
-            'desc_retorno'   => $this->extrairTag($retorno['body'], 'descRetorno'),
+            'desc_retorno'   => $this->extrairTag($retorno['body'], 'descRetorno')
+                                ?: ($sucessoEnvio ? 'Lote recebido — aguardando processamento assíncrono' : ''),
             'tempo_ms'       => $tempo,
             'ambiente'       => $this->tpAmb,
         ];
@@ -124,17 +131,18 @@ class TransmissaoService
 
     // ─── Internos ────────────────────────────────────────────
 
-    private function montarLote(string $cnpj, array $eventosXml): string
+       private function montarLote(string $cnpj, array $eventosXml): string
     {
-        $loteId = date('YmdHis') . str_pad(random_int(0, 99999), 5, '0', STR_PAD_LEFT);
-
         $eventosStr = '';
         foreach ($eventosXml as $i => $xml) {
-            $eventosStr .= "<evento id=\"evt_{$i}\">\n{$xml}\n</evento>\n";
+            // Remover declaração XML do evento individual (o lote já tem)
+            $xml = preg_replace('/<\?xml[^?]+\?>\s*/', '', $xml);
+            $eventosStr .= "      <evento id=\"evt_{$i}\">\n{$xml}\n      </evento>\n";
         }
 
         return '<?xml version="1.0" encoding="UTF-8"?>' . "\n"
-             . '<Reinf xmlns="http://www.reinf.esocial.gov.br/schemas/envioLoteEventosAssincrono/v1_00_00">' . "\n"
+             . '<Reinf xmlns="http://www.reinf.esocial.gov.br/schemas/envioLoteEventosAssincrono/v1_00_00"' . "\n"
+             . '       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">' . "\n"
              . "  <envioLoteEventos>\n"
              . "    <ideContribuinte>\n"
              . "      <tpInsc>1</tpInsc>\n"
@@ -147,14 +155,13 @@ class TransmissaoService
              . "</Reinf>";
     }
 
-    private function httpPost(string $url, string $xml): array
+  private function httpPost(string $url, string $xml): array
     {
         if (empty($url)) {
             return ['http_code' => 0, 'body' => 'URL de envio não configurada'];
         }
 
-        $config = \App\Models\AppConfig::get();
-        $certPath = (new AssinaturaService())->infoCertificado();
+        $userAgent = \App\Models\AppConfig::get('reinf.user_agent') ?? 'EFD-REINF-WEB/1.0';
 
         $ch = curl_init($url);
         curl_setopt_array($ch, [
@@ -162,6 +169,7 @@ class TransmissaoService
             CURLOPT_POSTFIELDS     => $xml,
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_TIMEOUT        => 60,
+            CURLOPT_USERAGENT      => $userAgent,
             CURLOPT_HTTPHEADER     => [
                 'Content-Type: application/xml',
                 'Accept: application/xml',
@@ -169,6 +177,7 @@ class TransmissaoService
             CURLOPT_SSL_VERIFYPEER => true,
             CURLOPT_SSLCERT        => $this->findCert('pem'),
             CURLOPT_SSLKEY         => $this->findCert('key'),
+            CURLOPT_SSLVERSION     => CURL_SSLVERSION_TLSv1_2,
         ]);
 
         $body     = curl_exec($ch);
