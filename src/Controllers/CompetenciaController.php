@@ -43,7 +43,7 @@ class CompetenciaController extends BaseController
         ]);
     }
 
-    public function detalhe(): void
+   public function detalhe(): void
     {
         $this->requireLogin();
         $id   = (int) $this->get('id');
@@ -53,7 +53,22 @@ class CompetenciaController extends BaseController
             $this->redirect('/competencias', 'Competência não encontrada.', 'erro');
         }
 
-        $eventos = (new EventoRepository($this->db))->carregarTodos($id);
+        // Paginação: cada tab tem seu próprio "?page_r2010=", "?page_r4020=" etc.
+        $limit  = 20;
+        $eventoRepo = new EventoRepository($this->db);
+        $eventos = [];
+
+        foreach (['r2010', 'r2020', 'r2060', 'r4010', 'r4020'] as $tab) {
+            $page   = max(1, (int) $this->get("page_{$tab}", 1));
+            $offset = ($page - 1) * $limit;
+            $total  = $eventoRepo->contar($tab, $id);
+            $order  = in_array($tab, ['r4010','r4020']) ? 'data_pagamento DESC' : 'created_at DESC';
+
+            $eventos[$tab] = $eventoRepo->listar($tab, $id, $order, $limit, $offset);
+            $eventos["{$tab}_total"] = $total;
+            $eventos["{$tab}_page"]  = $page;
+            $eventos["{$tab}_pages"] = (int) ceil($total / $limit);
+        }
 
         $this->view('pages/competencias/detalhe', [
             'pageTitle'   => 'Detalhe da Competência',

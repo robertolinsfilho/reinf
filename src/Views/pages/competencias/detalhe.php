@@ -30,38 +30,38 @@
 
 <!-- Resumo rápido -->
 <div class="row g-2 mb-3">
-    <div class="col"><div class="card p-3 text-center"><small class="text-muted d-block">R-2010</small><strong><?= count($r2010) ?></strong></div></div>
-    <div class="col"><div class="card p-3 text-center"><small class="text-muted d-block">R-2020</small><strong><?= count($r2020) ?></strong></div></div>
-    <div class="col"><div class="card p-3 text-center"><small class="text-muted d-block">R-2060</small><strong><?= count($r2060) ?></strong></div></div>
-    <div class="col"><div class="card p-3 text-center"><small class="text-muted d-block">R-4010</small><strong><?= count($r4010) ?></strong></div></div>
-    <div class="col"><div class="card p-3 text-center"><small class="text-muted d-block">R-4020</small><strong><?= count($r4020) ?></strong></div></div>
+    <div class="col"><div class="card p-3 text-center"><small class="text-muted d-block">R-2010</small><strong><?= number_format($r2010_total ?? 0, 0, ',', '.') ?></strong></div></div>
+    <div class="col"><div class="card p-3 text-center"><small class="text-muted d-block">R-2020</small><strong><?= number_format($r2020_total ?? 0, 0, ',', '.') ?></strong></div></div>
+    <div class="col"><div class="card p-3 text-center"><small class="text-muted d-block">R-2060</small><strong><?= number_format($r2060_total ?? 0, 0, ',', '.') ?></strong></div></div>
+    <div class="col"><div class="card p-3 text-center"><small class="text-muted d-block">R-4010</small><strong><?= number_format($r4010_total ?? 0, 0, ',', '.') ?></strong></div></div>
+    <div class="col"><div class="card p-3 text-center"><small class="text-muted d-block">R-4020</small><strong><?= number_format($r4020_total ?? 0, 0, ',', '.') ?></strong></div></div>
 </div>
 
 <!-- Tabs -->
 <ul class="nav nav-tabs">
     <li class="nav-item">
         <a class="nav-link active" data-bs-toggle="tab" href="#tab-r2010">
-            R-2010 <span class="badge bg-secondary ms-1"><?= count($r2010) ?></span>
+            R-2010 <span class="badge bg-secondary ms-1"><?= number_format($r2010_total ?? 0, 0, ',', '.') ?></span>
         </a>
     </li>
     <li class="nav-item">
         <a class="nav-link" data-bs-toggle="tab" href="#tab-r2020">
-            R-2020 <span class="badge bg-secondary ms-1"><?= count($r2020) ?></span>
+            R-2020 <span class="badge bg-secondary ms-1"><?= number_format($r2020_total ?? 0, 0, ',', '.') ?></span>
         </a>
     </li>
     <li class="nav-item">
         <a class="nav-link" data-bs-toggle="tab" href="#tab-r2060">
-            R-2060 <span class="badge bg-secondary ms-1"><?= count($r2060) ?></span>
+            R-2060 <span class="badge bg-secondary ms-1"><?= number_format($r2060_total ?? 0, 0, ',', '.') ?></span>
         </a>
     </li>
     <li class="nav-item">
         <a class="nav-link" data-bs-toggle="tab" href="#tab-r4010">
-            R-4010 <span class="badge bg-secondary ms-1"><?= count($r4010) ?></span>
+            R-4010 <span class="badge bg-secondary ms-1"><?= number_format($r4010_total ?? 0, 0, ',', '.') ?></span>
         </a>
     </li>
     <li class="nav-item">
         <a class="nav-link" data-bs-toggle="tab" href="#tab-r4020">
-            R-4020 <span class="badge bg-secondary ms-1"><?= count($r4020) ?></span>
+            R-4020 <span class="badge bg-secondary ms-1"><?= number_format($r4020_total ?? 0, 0, ',', '.') ?></span>
         </a>
     </li>
 </ul>
@@ -71,7 +71,20 @@
     <div class="tab-pane active" id="tab-r2010">
         <div class="card border-top-0 rounded-0 rounded-bottom">
             <div class="card-body p-0">
-                <div class="d-flex justify-content-end p-2">
+                <div class="d-flex justify-content-between align-items-center p-2">
+                    <div>
+                        <?php if (($r2010_pages ?? 1) > 1): ?>
+                        <div class="btn-group btn-group-sm">
+                            <?php if ($r2010_page > 1): ?>
+                            <a href="?id=<?= $competencia['id'] ?>&page_r2010=<?= $r2010_page - 1 ?>#tab-r2010" class="btn btn-outline-secondary"><i class="bi bi-chevron-left"></i></a>
+                            <?php endif; ?>
+                            <span class="btn btn-outline-secondary disabled">Pág <?= $r2010_page ?>/<?= $r2010_pages ?></span>
+                            <?php if ($r2010_page < $r2010_pages): ?>
+                            <a href="?id=<?= $competencia['id'] ?>&page_r2010=<?= $r2010_page + 1 ?>#tab-r2010" class="btn btn-outline-secondary"><i class="bi bi-chevron-right"></i></a>
+                            <?php endif; ?>
+                        </div>
+                        <?php endif; ?>
+                    </div>
                     <a href="/eventos/r2010?competencia_id=<?= $competencia['id'] ?>" class="btn btn-sm btn-outline-primary">
                         <i class="bi bi-pencil me-1"></i> Gerenciar R-2010
                     </a>
@@ -100,7 +113,20 @@
     <div class="tab-pane" id="tab-r2020">
         <div class="card border-top-0 rounded-0 rounded-bottom">
             <div class="card-body p-0">
-                <div class="d-flex justify-content-end p-2">
+                <div class="d-flex justify-content-between align-items-center p-2">
+                    <div>
+                        <?php if (($r2020_pages ?? 1) > 1): ?>
+                        <div class="btn-group btn-group-sm">
+                            <?php if ($r2020_page > 1): ?>
+                            <a href="?id=<?= $competencia['id'] ?>&page_r2020=<?= $r2020_page - 1 ?>#tab-r2020" class="btn btn-outline-secondary"><i class="bi bi-chevron-left"></i></a>
+                            <?php endif; ?>
+                            <span class="btn btn-outline-secondary disabled">Pág <?= $r2020_page ?>/<?= $r2020_pages ?></span>
+                            <?php if ($r2020_page < $r2020_pages): ?>
+                            <a href="?id=<?= $competencia['id'] ?>&page_r2020=<?= $r2020_page + 1 ?>#tab-r2020" class="btn btn-outline-secondary"><i class="bi bi-chevron-right"></i></a>
+                            <?php endif; ?>
+                        </div>
+                        <?php endif; ?>
+                    </div>
                     <a href="/eventos/r2020?competencia_id=<?= $competencia['id'] ?>" class="btn btn-sm btn-outline-primary">
                         <i class="bi bi-pencil me-1"></i> Gerenciar R-2020
                     </a>
@@ -129,7 +155,20 @@
     <div class="tab-pane" id="tab-r2060">
         <div class="card border-top-0 rounded-0 rounded-bottom">
             <div class="card-body p-0">
-                <div class="d-flex justify-content-end p-2">
+                <div class="d-flex justify-content-between align-items-center p-2">
+                    <div>
+                        <?php if (($r2060_pages ?? 1) > 1): ?>
+                        <div class="btn-group btn-group-sm">
+                            <?php if ($r2060_page > 1): ?>
+                            <a href="?id=<?= $competencia['id'] ?>&page_r2060=<?= $r2060_page - 1 ?>#tab-r2060" class="btn btn-outline-secondary"><i class="bi bi-chevron-left"></i></a>
+                            <?php endif; ?>
+                            <span class="btn btn-outline-secondary disabled">Pág <?= $r2060_page ?>/<?= $r2060_pages ?></span>
+                            <?php if ($r2060_page < $r2060_pages): ?>
+                            <a href="?id=<?= $competencia['id'] ?>&page_r2060=<?= $r2060_page + 1 ?>#tab-r2060" class="btn btn-outline-secondary"><i class="bi bi-chevron-right"></i></a>
+                            <?php endif; ?>
+                        </div>
+                        <?php endif; ?>
+                    </div>
                     <a href="/eventos/r2060?competencia_id=<?= $competencia['id'] ?>" class="btn btn-sm btn-outline-primary">
                         <i class="bi bi-pencil me-1"></i> Gerenciar R-2060
                     </a>
@@ -159,7 +198,20 @@
     <div class="tab-pane" id="tab-r4010">
         <div class="card border-top-0 rounded-0 rounded-bottom">
             <div class="card-body p-0">
-                <div class="d-flex justify-content-end p-2">
+                <div class="d-flex justify-content-between align-items-center p-2">
+                    <div>
+                        <?php if (($r4010_pages ?? 1) > 1): ?>
+                        <div class="btn-group btn-group-sm">
+                            <?php if ($r4010_page > 1): ?>
+                            <a href="?id=<?= $competencia['id'] ?>&page_r4010=<?= $r4010_page - 1 ?>#tab-r4010" class="btn btn-outline-secondary"><i class="bi bi-chevron-left"></i></a>
+                            <?php endif; ?>
+                            <span class="btn btn-outline-secondary disabled">Pág <?= $r4010_page ?>/<?= $r4010_pages ?></span>
+                            <?php if ($r4010_page < $r4010_pages): ?>
+                            <a href="?id=<?= $competencia['id'] ?>&page_r4010=<?= $r4010_page + 1 ?>#tab-r4010" class="btn btn-outline-secondary"><i class="bi bi-chevron-right"></i></a>
+                            <?php endif; ?>
+                        </div>
+                        <?php endif; ?>
+                    </div>
                     <a href="/eventos/r4010?competencia_id=<?= $competencia['id'] ?>" class="btn btn-sm btn-outline-primary">
                         <i class="bi bi-pencil me-1"></i> Gerenciar R-4010
                     </a>
@@ -189,7 +241,20 @@
     <div class="tab-pane" id="tab-r4020">
         <div class="card border-top-0 rounded-0 rounded-bottom">
             <div class="card-body p-0">
-                <div class="d-flex justify-content-end p-2">
+                <div class="d-flex justify-content-between align-items-center p-2">
+                    <div>
+                        <?php if (($r4020_pages ?? 1) > 1): ?>
+                        <div class="btn-group btn-group-sm">
+                            <?php if ($r4020_page > 1): ?>
+                            <a href="?id=<?= $competencia['id'] ?>&page_r4020=<?= $r4020_page - 1 ?>#tab-r4020" class="btn btn-outline-secondary"><i class="bi bi-chevron-left"></i></a>
+                            <?php endif; ?>
+                            <span class="btn btn-outline-secondary disabled">Pág <?= $r4020_page ?>/<?= $r4020_pages ?></span>
+                            <?php if ($r4020_page < $r4020_pages): ?>
+                            <a href="?id=<?= $competencia['id'] ?>&page_r4020=<?= $r4020_page + 1 ?>#tab-r4020" class="btn btn-outline-secondary"><i class="bi bi-chevron-right"></i></a>
+                            <?php endif; ?>
+                        </div>
+                        <?php endif; ?>
+                    </div>
                     <a href="/eventos/r4020?competencia_id=<?= $competencia['id'] ?>" class="btn btn-sm btn-outline-primary">
                         <i class="bi bi-pencil me-1"></i> Gerenciar R-4020
                     </a>
@@ -215,4 +280,15 @@
             </div>
         </div>
     </div>
+    <script>
+// Após reload, ativar a tab conforme hash na URL
+document.addEventListener('DOMContentLoaded', function() {
+    if (window.location.hash) {
+        const tabTrigger = document.querySelector(`a[href="${window.location.hash}"]`);
+        if (tabTrigger) {
+            new bootstrap.Tab(tabTrigger).show();
+        }
+    }
+});
+</script>
 </div>

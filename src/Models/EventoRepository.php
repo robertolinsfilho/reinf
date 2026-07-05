@@ -55,14 +55,14 @@ class EventoRepository
             ->execute([$id, $competenciaId]);
     }
 
-    public function carregarTodos(int $competenciaId): array
+    public function carregarTodos(int $competenciaId, int $limitPorEvento = 20): array
     {
         return [
-            'r2010' => $this->listar('r2010', $competenciaId),
-            'r2020' => $this->listar('r2020', $competenciaId),
-            'r2060' => $this->listar('r2060', $competenciaId),
-            'r4010' => $this->listar('r4010', $competenciaId),
-            'r4020' => $this->listar('r4020', $competenciaId),
+            'r2010' => $this->listar('r2010', $competenciaId, 'created_at DESC', $limitPorEvento),
+            'r2020' => $this->listar('r2020', $competenciaId, 'created_at DESC', $limitPorEvento),
+            'r2060' => $this->listar('r2060', $competenciaId, 'created_at DESC', $limitPorEvento),
+            'r4010' => $this->listar('r4010', $competenciaId, 'data_pagamento DESC', $limitPorEvento),
+            'r4020' => $this->listar('r4020', $competenciaId, 'data_pagamento DESC', $limitPorEvento),
         ];
     }
 
