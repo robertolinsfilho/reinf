@@ -29,11 +29,43 @@ class EventoController extends BaseController
 
     private function getComp(int $id): array
     {
+        if (!$id) {
+            $stmt = $this->db->prepare("
+                SELECT c.id FROM competencias c
+                JOIN contribuintes co ON co.id = c.contribuinte_id
+                WHERE co.usuario_id = ? AND c.status IN ('aberto', 'fechado')
+                ORDER BY c.periodo DESC LIMIT 2
+            ");
+            $stmt->execute([$this->userId()]);
+            $comps = $stmt->fetchAll();
+
+            if (count($comps) === 1) {
+                $uri = strtok($_SERVER['REQUEST_URI'], '?');
+                $this->redirect("{$uri}?competencia_id={$comps[0]['id']}");
+            }
+            $this->redirect('/competencias', 'Selecione uma competência.', 'info');
+        }
         $comp = $this->competencias->findWithContribuinte($id, $this->userId());
         if (!$comp) {
             $this->redirect('/competencias', 'Competência não encontrada.', 'erro');
         }
         return $comp;
+    }
+
+    private function paginacao(int $cid, string $tabela): array
+    {
+        $page   = max(1, (int) $this->get('page', 1));
+        $limit  = 50;
+        $offset = ($page - 1) * $limit;
+        $total  = $this->eventos->contar($tabela, $cid);
+
+        return [
+            'page'       => $page,
+            'limit'      => $limit,
+            'offset'     => $offset,
+            'total'      => $total,
+            'totalPages' => (int) ceil($total / $limit),
+        ];
     }
 
     // ═══ R-2010 ══════════════════════════════════════════════
@@ -42,10 +74,15 @@ class EventoController extends BaseController
     {
         $this->requireLogin();
         $cid = (int) $this->get('competencia_id');
+        $p   = $this->paginacao($cid, 'r2010');
+
         $this->view('pages/eventos/r2010', [
             'pageTitle'   => 'R-2010 – Retenções INSS Contratados',
             'competencia' => $this->getComp($cid),
-            'registros'   => $this->eventos->listar('r2010', $cid),
+            'registros'   => $this->eventos->listar('r2010', $cid, 'created_at DESC', $p['limit'], $p['offset']),
+            'total'       => $p['total'],
+            'page'        => $p['page'],
+            'totalPages'  => $p['totalPages'],
             'flash'       => $this->getFlash(),
         ]);
     }
@@ -95,10 +132,15 @@ class EventoController extends BaseController
     {
         $this->requireLogin();
         $cid = (int) $this->get('competencia_id');
+        $p   = $this->paginacao($cid, 'r2020');
+
         $this->view('pages/eventos/r2020', [
             'pageTitle'   => 'R-2020 – Retenções INSS Contratantes',
             'competencia' => $this->getComp($cid),
-            'registros'   => $this->eventos->listar('r2020', $cid),
+            'registros'   => $this->eventos->listar('r2020', $cid, 'created_at DESC', $p['limit'], $p['offset']),
+            'total'       => $p['total'],
+            'page'        => $p['page'],
+            'totalPages'  => $p['totalPages'],
             'flash'       => $this->getFlash(),
         ]);
     }
@@ -140,10 +182,15 @@ class EventoController extends BaseController
     {
         $this->requireLogin();
         $cid = (int) $this->get('competencia_id');
+        $p   = $this->paginacao($cid, 'r2060');
+
         $this->view('pages/eventos/r2060', [
             'pageTitle'   => 'R-2060 – CPRB',
             'competencia' => $this->getComp($cid),
-            'registros'   => $this->eventos->listar('r2060', $cid),
+            'registros'   => $this->eventos->listar('r2060', $cid, 'created_at DESC', $p['limit'], $p['offset']),
+            'total'       => $p['total'],
+            'page'        => $p['page'],
+            'totalPages'  => $p['totalPages'],
             'flash'       => $this->getFlash(),
         ]);
     }
@@ -185,17 +232,21 @@ class EventoController extends BaseController
 
     // ═══ R-4010 ══════════════════════════════════════════════
 
-       public function r4010(): void
+    public function r4010(): void
     {
         $this->requireLogin();
         $cid       = (int) $this->get('competencia_id');
-        $naturezas = new NaturezaRendimentoRepository($this->db);
+        $p         = $this->paginacao($cid, 'r4010');
+        $naturezas = (new NaturezaRendimentoRepository($this->db))->agrupadoPorTipo('pf');
 
         $this->view('pages/eventos/r4010', [
             'pageTitle'   => 'R-4010 – Pagamentos/Créditos PF (IRRF)',
             'competencia' => $this->getComp($cid),
-            'registros'   => $this->eventos->listar('r4010', $cid, 'data_pagamento DESC'),
-            'naturezas'   => $naturezas->agrupadoPorTipo('pf'),
+            'registros'   => $this->eventos->listar('r4010', $cid, 'data_pagamento DESC', $p['limit'], $p['offset']),
+            'naturezas'   => $naturezas,
+            'total'       => $p['total'],
+            'page'        => $p['page'],
+            'totalPages'  => $p['totalPages'],
             'flash'       => $this->getFlash(),
         ]);
     }
@@ -233,108 +284,14 @@ class EventoController extends BaseController
         $this->redirect("/eventos/r4010?competencia_id={$cid}", 'Registro excluído.', 'sucesso');
     }
 
-    // ═══ R-4020 ══════════════════════════════════════════════
-
-     public function r4020(): void
-    {
-        $this->requireLogin();
-        $cid = (int) $this->get('competencia_id');
-
-        // Carrega naturezas da Tabela 4020 (formato PJ oficial)
-        $stmt = $this->db->prepare("
-            SELECT codigo, descricao, grupo
-            FROM naturezas_rendimento
-            WHERE ativo = 1 AND tabela_origem = '4020'
-            ORDER BY grupo, codigo
-        ");
-        $stmt->execute();
-        $regs = $stmt->fetchAll();
-
-        $naturezas = [];
-        foreach ($regs as $r) {
-            $naturezas[$r['grupo']][] = ['codigo' => $r['codigo'], 'descricao' => $r['descricao']];
-        }
-
-        $this->view('pages/eventos/r4020', [
-            'pageTitle'   => 'R-4020 – Pagamentos/Créditos PJ',
-            'competencia' => $this->getComp($cid),
-            'registros'   => $this->eventos->listar('r4020', $cid, 'data_pagamento DESC'),
-            'naturezas'   => $naturezas,
-            'flash'       => $this->getFlash(),
-        ]);
-    }
-
-    Agora vou passar os arquivos PHP atualizados. São 4:
-
-1. src/Services/ImportacaoService.php — SUBSTITUIR o método importarR4020
-Localize o método importarR4020 no arquivo (não substitua o arquivo inteiro, só esse método):
-php    private function importarR4020(array $row, int $competenciaId): void
-    {
-        // Formato oficial (planilha RFB - 22 colunas):
-        // A=CNPJ Contribuinte, B=CNPJ Prestador, C=Nº NFS, D=Período Apuração,
-        // E=Data Fato Gerador, F=Valor Bruto, G=Cod Tipo Serviço, H=Cód País,
-        // I=Base Cálculo, J=IRRF, K=CSRF agregado, L=CSLL, M=PIS, N=COFINS,
-        // O=Identificador, P=Ind FCI/SCP, Q=CNPJ FCI/SCP, R=% SCP,
-        // S=Ind Judicial, T=Nº Processo, U=Ind Origem, V=Observações
-
-        $cnpjBenef = preg_replace('/\D/', '', (string)($row['B'] ?? ''));
-
-        // Pular linhas em branco
-        if (empty($cnpjBenef) || strlen($cnpjBenef) < 11) {
-            return;
-        }
-
-        $codTipoServico = str_pad(trim((string)($row['G'] ?? '')), 5, '0', STR_PAD_LEFT);
-        $natRend        = $codTipoServico; // No R-4020, natureza = cod tipo serviço da Tab 4020
-
-        $stmt = $this->db->prepare("
-            INSERT INTO r4020 (
-                competencia_id, cnpj_contribuinte, cnpj_beneficiario, num_nfs,
-                periodo_apuracao, natureza_rendimento, cod_tipo_servico, cod_pais,
-                data_pagamento, valor_bruto, valor_base_ir, valor_ir,
-                vl_csrf_agregado, valor_csll, valor_pis, valor_cofins,
-                identificador_adicional, indicador_fci_scp, cnpj_fci_scp, percentual_scp,
-                indicador_judicial, numero_processo, indicador_origem_recurso, observacoes
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ");
-        $stmt->execute([
-            $competenciaId,
-            preg_replace('/\D/', '', (string)($row['A'] ?? '')) ?: null,
-            $cnpjBenef,
-            (string)($row['C'] ?? ''),
-            $this->parseData($row['D'] ?? null),
-            $natRend,
-            $codTipoServico,
-            (string)($row['H'] ?? '') ?: null,
-            $this->parseData($row['E'] ?? null),
-            $this->parseMoeda($row['F'] ?? 0),
-            $this->parseMoeda($row['I'] ?? 0),
-            $this->parseMoeda($row['J'] ?? 0),
-            $this->parseMoeda($row['K'] ?? 0),
-            $this->parseMoeda($row['L'] ?? 0),
-            $this->parseMoeda($row['M'] ?? 0),
-            $this->parseMoeda($row['N'] ?? 0),
-            (string)($row['O'] ?? '') ?: null,
-            !empty($row['P']) ? (int)$row['P'] : null,
-            preg_replace('/\D/', '', (string)($row['Q'] ?? '')) ?: null,
-            !empty($row['R']) ? (float)$row['R'] : null,
-            !empty($row['S']) ? 1 : 0,
-            (string)($row['T'] ?? '') ?: null,
-            !empty($row['U']) ? (int)$row['U'] : null,
-            (string)($row['V'] ?? '') ?: null,
-        ]);
-    }
-
-2. src/Controllers/EventoController.php — Substituir métodos r4020 e salvarR4020
-Substitua os 2 métodos existentes por:
-php    // ═══ R-4020 ══════════════════════════════════════════════
+    // ═══ R-4020 (Formato Oficial RFB) ═══════════════════════
 
     public function r4020(): void
     {
         $this->requireLogin();
         $cid = (int) $this->get('competencia_id');
+        $p   = $this->paginacao($cid, 'r4020');
 
-        // Carrega naturezas da Tabela 4020 (formato PJ oficial)
         $stmt = $this->db->prepare("
             SELECT codigo, descricao, grupo
             FROM naturezas_rendimento
@@ -352,8 +309,11 @@ php    // ═══ R-4020 ═════════════════�
         $this->view('pages/eventos/r4020', [
             'pageTitle'   => 'R-4020 – Pagamentos/Créditos PJ',
             'competencia' => $this->getComp($cid),
-            'registros'   => $this->eventos->listar('r4020', $cid, 'data_pagamento DESC'),
+            'registros'   => $this->eventos->listar('r4020', $cid, 'data_pagamento DESC', $p['limit'], $p['offset']),
             'naturezas'   => $naturezas,
+            'total'       => $p['total'],
+            'page'        => $p['page'],
+            'totalPages'  => $p['totalPages'],
             'flash'       => $this->getFlash(),
         ]);
     }
@@ -394,4 +354,13 @@ php    // ═══ R-4020 ═════════════════�
         }, "/eventos/r4020?competencia_id={$cid}");
     }
 
+    public function excluirR4020(): void
+    {
+        $this->requireLogin();
+        $id  = (int) ($this->post('id') ?? $this->get('id'));
+        $cid = (int) ($this->post('competencia_id') ?? $this->get('competencia_id'));
+        $this->getComp($cid);
+        $this->eventos->excluir('r4020', $id, $cid);
+        $this->redirect("/eventos/r4020?competencia_id={$cid}", 'Registro excluído.', 'sucesso');
+    }
 }

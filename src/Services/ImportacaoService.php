@@ -201,4 +201,30 @@ class ImportacaoService
             (string)($row['V'] ?? '') ?: null,
         ]);
     }
+    private function parseMoeda(mixed $val): float
+    {
+        if (is_numeric($val)) return (float) $val;
+        $val = str_replace(['.', ','], ['', '.'], (string) $val);
+        return (float) $val;
+    }
+
+    private function parseData(mixed $val): ?string
+    {
+        if (!$val) return null;
+
+        // Se é um objeto DateTime (do PhpSpreadsheet quando lê datas do Excel)
+        if ($val instanceof \DateTimeInterface) {
+            return $val->format('Y-m-d');
+        }
+
+        // Se é serial number do Excel
+        if (is_numeric($val)) {
+            $unix = ((int) $val - 25569) * 86400;
+            return date('Y-m-d', $unix);
+        }
+
+        // String
+        $ts = strtotime((string) $val);
+        return $ts ? date('Y-m-d', $ts) : null;
+    }
 }

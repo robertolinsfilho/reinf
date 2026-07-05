@@ -11,11 +11,14 @@ class EventoRepository
         $this->db = $db;
     }
 
-    public function listar(string $evento, int $competenciaId, string $orderBy = 'created_at DESC'): array
+    public function listar(string $evento, int $competenciaId, string $orderBy = 'created_at DESC', int $limit = 100, int $offset = 0): array
     {
         $tabela = $this->validarTabela($evento);
-        $stmt   = $this->db->prepare("SELECT * FROM {$tabela} WHERE competencia_id = ? ORDER BY {$orderBy}");
-        $stmt->execute([$competenciaId]);
+        $stmt   = $this->db->prepare("SELECT * FROM {$tabela} WHERE competencia_id = ? ORDER BY {$orderBy} LIMIT ? OFFSET ?");
+        $stmt->bindValue(1, $competenciaId, \PDO::PARAM_INT);
+        $stmt->bindValue(2, $limit, \PDO::PARAM_INT);
+        $stmt->bindValue(3, $offset, \PDO::PARAM_INT);
+        $stmt->execute();
         return $stmt->fetchAll();
     }
 

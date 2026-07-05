@@ -89,23 +89,25 @@
                     </div>
 
                     <div class="row g-2 mb-2">
-                        <div class="col-3">
+                        <div class="col-6">
                             <label class="form-label small">IRRF</label>
                             <input type="text" name="valor_ir" class="form-control form-control-sm text-end" placeholder="0,00">
                         </div>
-                        <div class="col-3">
+                        <div class="col-6">
                             <label class="form-label small">CSRF Agregado</label>
                             <input type="text" name="vl_csrf_agregado" class="form-control form-control-sm text-end" placeholder="0,00">
                         </div>
-                        <div class="col-2">
+                    </div>
+                    <div class="row g-2 mb-2">
+                        <div class="col-4">
                             <label class="form-label small">CSLL</label>
                             <input type="text" name="valor_csll" class="form-control form-control-sm text-end" placeholder="0,00">
                         </div>
-                        <div class="col-2">
+                        <div class="col-4">
                             <label class="form-label small">PIS</label>
                             <input type="text" name="valor_pis" class="form-control form-control-sm text-end" placeholder="0,00">
                         </div>
-                        <div class="col-2">
+                        <div class="col-4">
                             <label class="form-label small">COFINS</label>
                             <input type="text" name="valor_cofins" class="form-control form-control-sm text-end" placeholder="0,00">
                         </div>
@@ -145,42 +147,25 @@
 
     <div class="col-lg-7">
         <div class="card">
-            <div class="card-header">
-                Registros <span class="badge bg-secondary ms-1"><?= count($registros) ?></span>
-            </div>
-            <div class="table-responsive">
-                <table class="table table-sm table-hover mb-0">
-                    <thead>
-                        <tr>
-                            <th>CNPJ</th><th>Cód</th><th>Data</th>
-                            <th class="text-end">Bruto</th><th class="text-end">IR</th>
-                            <th class="text-end">CSLL</th><th class="text-end">PIS/COF</th><th></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php if (empty($registros)): ?>
-                        <tr><td colspan="8" class="text-center text-muted py-4">Nenhum registro.</td></tr>
-                        <?php else: foreach ($registros as $r): ?>
-                        <tr>
-                            <td class="font-monospace small"><?= $r['cnpj_beneficiario'] ?></td>
-                            <td class="font-monospace small"><?= $r['cod_tipo_servico'] ?? $r['natureza_rendimento'] ?></td>
-                            <td class="small"><?= $r['data_pagamento'] ? date('d/m/Y', strtotime($r['data_pagamento'])) : '' ?></td>
-                            <td class="text-end small">R$ <?= number_format($r['valor_bruto'], 2, ',', '.') ?></td>
-                            <td class="text-end small text-danger">R$ <?= number_format($r['valor_ir'], 2, ',', '.') ?></td>
-                            <td class="text-end small">R$ <?= number_format($r['valor_csll'], 2, ',', '.') ?></td>
-                            <td class="text-end small">R$ <?= number_format(($r['valor_pis'] ?? 0) + ($r['valor_cofins'] ?? 0), 2, ',', '.') ?></td>
-                            <td>
-                                <form action="/eventos/r4020/excluir" method="POST" onsubmit="return confirm('Excluir?')">
-                                    <input type="hidden" name="id" value="<?= $r['id'] ?>">
-                                    <input type="hidden" name="competencia_id" value="<?= $competencia['id'] ?>">
-                                    <button class="btn btn-outline-danger btn-sm py-0 px-1"><i class="bi bi-trash3"></i></button>
-                                </form>
-                            </td>
-                        </tr>
-                        <?php endforeach; endif; ?>
-                    </tbody>
-                </table>
-            </div>
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>Registros <span class="badge bg-secondary ms-1"><?= number_format($total ?? count($registros), 0, ',', '.') ?></span></span>
+                <?php if (($totalPages ?? 1) > 1): ?>
+                <div class="btn-group btn-group-sm">
+                    <?php if (($page ?? 1) > 1): ?>
+                    <a href="?competencia_id=<?= $competencia['id'] ?>&page=<?= $page - 1 ?>" class="btn btn-outline-secondary">
+                        <i class="bi bi-chevron-left"></i>
+                    </a>
+                    <?php endif; ?>
+                    <span class="btn btn-outline-secondary disabled">
+                        Página <?= $page ?? 1 ?> de <?= number_format($totalPages, 0, ',', '.') ?>
+                    </span>
+                    <?php if (($page ?? 1) < ($totalPages ?? 1)): ?>
+                    <a href="?competencia_id=<?= $competencia['id'] ?>&page=<?= $page + 1 ?>" class="btn btn-outline-secondary">
+                        <i class="bi bi-chevron-right"></i>
+                    </a>
+                    <?php endif; ?>
+                </div>
+                <?php endif; ?>
         </div>
     </div>
 </div>

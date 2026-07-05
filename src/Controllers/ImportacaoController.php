@@ -48,8 +48,8 @@ class ImportacaoController extends BaseController
         $arquivo = $_FILES['arquivo'];
         $ext     = strtolower(pathinfo($arquivo['name'], PATHINFO_EXTENSION));
 
-        if (!in_array($ext, ['xlsx', 'xls'])) {
-            $this->redirect('/importar', 'Arquivo deve ser .xlsx ou .xls.', 'erro');
+        if (!in_array($ext, ['xlsx', 'xlsm', 'xls'])) {
+            $this->redirect('/importar', 'Arquivo deve ser .xlsx, .xlsm ou .xls.', 'erro');
         }
 
         $uploadDir = $this->config['upload']['path'] ?? BASE_PATH . '/public/uploads/';

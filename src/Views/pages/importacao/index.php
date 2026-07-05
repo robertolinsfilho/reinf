@@ -54,8 +54,8 @@
 
                     <div class="mb-3">
                         <label class="form-label fw-bold">Arquivo Excel *</label>
-                        <input type="file" name="arquivo" class="form-control" accept=".xlsx,.xls" required>
-                        <div class="form-text">Formatos aceitos: .xlsx, .xls (máximo 50MB)</div>
+                      <input type="file" name="arquivo" class="form-control" accept=".xlsx,.xlsm,.xls" required>
+                      <div class="form-text">Formatos aceitos: .xlsx, .xlsm, .xls (máximo 50MB)</div>
                     </div>
 
                     <button type="submit" class="btn btn-primary w-100">
