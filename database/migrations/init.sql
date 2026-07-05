@@ -1,5 +1,6 @@
 -- ============================================
--- EFD-Reinf · Schema v2.1.2
+-- EFD-Reinf · Schema v2.1.2 COMPLETO
+-- Tudo em um único arquivo para primeira execução
 -- ============================================
 
 CREATE DATABASE IF NOT EXISTS efd_reinf
@@ -7,7 +8,7 @@ CREATE DATABASE IF NOT EXISTS efd_reinf
   COLLATE utf8mb4_unicode_ci;
 USE efd_reinf;
 
--- Usuários
+-- ─── Usuários ────────────────────────────────
 CREATE TABLE IF NOT EXISTS usuarios (
     id INT AUTO_INCREMENT PRIMARY KEY,
     nome VARCHAR(150) NOT NULL,
@@ -21,14 +22,14 @@ CREATE TABLE IF NOT EXISTS usuarios (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
--- Contribuintes (empresas)
+-- ─── Contribuintes ───────────────────────────
 CREATE TABLE IF NOT EXISTS contribuintes (
     id INT AUTO_INCREMENT PRIMARY KEY,
     usuario_id INT NOT NULL,
     cnpj VARCHAR(14) NOT NULL,
     razao_social VARCHAR(200) NOT NULL,
     nome_fantasia VARCHAR(200),
-    tipo_contribuinte ENUM('1','2') DEFAULT '1' COMMENT '1=PJ(CNPJ), 2=PF(CPF)',
+    tipo_contribuinte ENUM('1','2') DEFAULT '1',
     classificacao_tributos VARCHAR(10) DEFAULT '01',
     ie VARCHAR(20),
     cnae_principal VARCHAR(7),
@@ -44,11 +45,11 @@ CREATE TABLE IF NOT EXISTS contribuintes (
     INDEX idx_cnpj (cnpj)
 ) ENGINE=InnoDB;
 
--- Competências (períodos de apuração)
+-- ─── Competências ────────────────────────────
 CREATE TABLE IF NOT EXISTS competencias (
     id INT AUTO_INCREMENT PRIMARY KEY,
     contribuinte_id INT NOT NULL,
-    periodo VARCHAR(7) NOT NULL COMMENT 'AAAA-MM',
+    periodo VARCHAR(7) NOT NULL,
     status ENUM('aberto','fechado','transmitido','retificado') DEFAULT 'aberto',
     num_recibo VARCHAR(50) NULL,
     data_envio DATETIME NULL,
@@ -59,11 +60,11 @@ CREATE TABLE IF NOT EXISTS competencias (
     UNIQUE KEY uk_competencia (contribuinte_id, periodo)
 ) ENGINE=InnoDB;
 
--- R-1070: Processos administrativos/judiciais
+-- ─── R-1070 Processos ────────────────────────
 CREATE TABLE IF NOT EXISTS r1070_processos (
     id INT AUTO_INCREMENT PRIMARY KEY,
     contribuinte_id INT NOT NULL,
-    tipo_processo TINYINT NOT NULL COMMENT '1=Adm, 2=Judicial',
+    tipo_processo TINYINT NOT NULL,
     numero_processo VARCHAR(30) NOT NULL,
     indicador_autoria TINYINT NULL,
     uf_vara CHAR(2) NULL,
@@ -77,12 +78,10 @@ CREATE TABLE IF NOT EXISTS r1070_processos (
     status ENUM('ativo','encerrado','suspenso') DEFAULT 'ativo',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (contribuinte_id) REFERENCES contribuintes(id) ON DELETE CASCADE,
-    INDEX idx_r1070_contrib (contribuinte_id),
-    INDEX idx_r1070_proc (numero_processo)
+    FOREIGN KEY (contribuinte_id) REFERENCES contribuintes(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
--- R-2010: Retenção INSS – Serviços Tomados
+-- ─── R-2010 ──────────────────────────────────
 CREATE TABLE IF NOT EXISTS r2010 (
     id INT AUTO_INCREMENT PRIMARY KEY,
     competencia_id INT NOT NULL,
@@ -100,12 +99,10 @@ CREATE TABLE IF NOT EXISTS r2010 (
     cod_servico VARCHAR(10),
     tp_servico TINYINT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (competencia_id) REFERENCES competencias(id) ON DELETE CASCADE,
-    INDEX idx_r2010_comp (competencia_id),
-    INDEX idx_r2010_prestador (cnpj_prestador)
+    FOREIGN KEY (competencia_id) REFERENCES competencias(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
--- R-2020: Retenção INSS – Serviços Prestados
+-- ─── R-2020 ──────────────────────────────────
 CREATE TABLE IF NOT EXISTS r2020 (
     id INT AUTO_INCREMENT PRIMARY KEY,
     competencia_id INT NOT NULL,
@@ -120,11 +117,10 @@ CREATE TABLE IF NOT EXISTS r2020 (
     valor_retencao DECIMAL(15,2) DEFAULT 0.00,
     valor_retencao_ajustada DECIMAL(15,2) DEFAULT 0.00,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (competencia_id) REFERENCES competencias(id) ON DELETE CASCADE,
-    INDEX idx_r2020_comp (competencia_id)
+    FOREIGN KEY (competencia_id) REFERENCES competencias(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
--- R-2060: CPRB
+-- ─── R-2060 ──────────────────────────────────
 CREATE TABLE IF NOT EXISTS r2060 (
     id INT AUTO_INCREMENT PRIMARY KEY,
     competencia_id INT NOT NULL,
@@ -135,17 +131,16 @@ CREATE TABLE IF NOT EXISTS r2060 (
     aliquota DECIMAL(5,2) DEFAULT 0.00,
     valor_cprb DECIMAL(15,2) DEFAULT 0.00,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (competencia_id) REFERENCES competencias(id) ON DELETE CASCADE,
-    INDEX idx_r2060_comp (competencia_id)
+    FOREIGN KEY (competencia_id) REFERENCES competencias(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
--- R-4010: Pagamentos/créditos a beneficiário PF
+-- ─── R-4010 ──────────────────────────────────
 CREATE TABLE IF NOT EXISTS r4010 (
     id INT AUTO_INCREMENT PRIMARY KEY,
     competencia_id INT NOT NULL,
     cpf_beneficiario VARCHAR(11) NOT NULL,
     nome_beneficiario VARCHAR(200),
-    natureza_rendimento VARCHAR(5) NOT NULL COMMENT 'Tabela 01 EFD-Reinf',
+    natureza_rendimento VARCHAR(5) NOT NULL,
     data_pagamento DATE NOT NULL,
     valor_bruto DECIMAL(15,2) DEFAULT 0.00,
     valor_ir DECIMAL(15,2) DEFAULT 0.00,
@@ -153,12 +148,10 @@ CREATE TABLE IF NOT EXISTS r4010 (
     valor_deducao DECIMAL(15,2) DEFAULT 0.00,
     descricao_pagamento VARCHAR(255),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (competencia_id) REFERENCES competencias(id) ON DELETE CASCADE,
-    INDEX idx_r4010_comp (competencia_id),
-    INDEX idx_r4010_cpf (cpf_beneficiario)
+    FOREIGN KEY (competencia_id) REFERENCES competencias(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
--- R-4020: Pagamentos/créditos a beneficiário PJ (formato oficial completo)
+-- ─── R-4020 (formato oficial completo) ───────
 CREATE TABLE IF NOT EXISTS r4020 (
     id INT AUTO_INCREMENT PRIMARY KEY,
     competencia_id INT NOT NULL,
@@ -167,7 +160,7 @@ CREATE TABLE IF NOT EXISTS r4020 (
     num_nfs VARCHAR(50) NULL,
     periodo_apuracao DATE NULL,
     razao_social_beneficiario VARCHAR(200),
-    natureza_rendimento VARCHAR(5) NOT NULL COMMENT 'Tabela 4020 EFD-Reinf',
+    natureza_rendimento VARCHAR(5) NOT NULL,
     cod_tipo_servico VARCHAR(5) NULL,
     cod_pais VARCHAR(3) NULL,
     data_pagamento DATE NOT NULL,
@@ -187,12 +180,10 @@ CREATE TABLE IF NOT EXISTS r4020 (
     indicador_origem_recurso TINYINT NULL,
     observacoes TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (competencia_id) REFERENCES competencias(id) ON DELETE CASCADE,
-    INDEX idx_r4020_comp (competencia_id),
-    INDEX idx_r4020_cnpj (cnpj_beneficiario)
+    FOREIGN KEY (competencia_id) REFERENCES competencias(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
--- Naturezas de Rendimento (Tabelas 01 e 4020)
+-- ─── Naturezas Rendimento ────────────────────
 CREATE TABLE IF NOT EXISTS naturezas_rendimento (
     codigo VARCHAR(5) PRIMARY KEY,
     descricao VARCHAR(255) NOT NULL,
@@ -202,9 +193,9 @@ CREATE TABLE IF NOT EXISTS naturezas_rendimento (
     ativo TINYINT(1) DEFAULT 1,
     tributo VARCHAR(10) NULL,
     tabela_origem VARCHAR(10) DEFAULT '01'
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB;
 
--- Certificados digitais A1
+-- ─── Certificados ────────────────────────────
 CREATE TABLE IF NOT EXISTS certificados (
     id INT AUTO_INCREMENT PRIMARY KEY,
     contribuinte_id INT NOT NULL,
@@ -218,7 +209,7 @@ CREATE TABLE IF NOT EXISTS certificados (
     FOREIGN KEY (contribuinte_id) REFERENCES contribuintes(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
--- Transmissões (log de envios)
+-- ─── Transmissões ────────────────────────────
 CREATE TABLE IF NOT EXISTS transmissoes (
     id INT AUTO_INCREMENT PRIMARY KEY,
     competencia_id INT NOT NULL,
@@ -234,14 +225,13 @@ CREATE TABLE IF NOT EXISTS transmissoes (
     descricao_retorno TEXT,
     sucesso TINYINT(1) DEFAULT 0,
     tempo_resposta_ms INT,
-    ambiente TINYINT COMMENT '1=prod, 2=hom',
+    ambiente TINYINT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (competencia_id) REFERENCES competencias(id) ON DELETE CASCADE,
-    FOREIGN KEY (usuario_id) REFERENCES usuarios(id),
-    INDEX idx_transmissao_comp (competencia_id)
+    FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
 ) ENGINE=InnoDB;
 
--- Importações de Excel
+-- ─── Importações ─────────────────────────────
 CREATE TABLE IF NOT EXISTS importacoes (
     id INT AUTO_INCREMENT PRIMARY KEY,
     competencia_id INT NOT NULL,
@@ -257,7 +247,7 @@ CREATE TABLE IF NOT EXISTS importacoes (
     FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
--- Arquivos gerados
+-- ─── Arquivos gerados ────────────────────────
 CREATE TABLE IF NOT EXISTS arquivos_gerados (
     id INT AUTO_INCREMENT PRIMARY KEY,
     competencia_id INT NOT NULL,
@@ -269,43 +259,33 @@ CREATE TABLE IF NOT EXISTS arquivos_gerados (
     hash_md5 VARCHAR(32),
     xml_conteudo LONGTEXT,
     assinado TINYINT(1) DEFAULT 0,
-    ind_retif TINYINT(1) DEFAULT 1 COMMENT '1=Inclusão, 2=Retificação',
+    ind_retif TINYINT(1) DEFAULT 1,
     nr_recibo_original VARCHAR(50) NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (competencia_id) REFERENCES competencias(id) ON DELETE CASCADE,
-    FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE,
-    INDEX idx_arq_comp (competencia_id)
+    FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
--- Seed do administrador
--- E-mail: admin@efdreinf.com.br
--- Senha: admin123
+-- ============================================
+-- SEEDS
+-- ============================================
+
+-- Admin (senha: admin123)
 INSERT INTO usuarios (nome, email, senha, perfil, ativo) VALUES
 ('Administrador', 'admin@efdreinf.com.br',
  '$2y$10$i7YbP/ylBPLklB6sh..fqO.kHgA7o8vKHVinZOa9fvbnmAqSzT5Oi',
  'admin', 1);
 
--- Seed inicial de naturezas de rendimento — Tabela 01 (para R-4010 / PF)
+-- Tabela 01 - Naturezas PF (R-4010)
 INSERT IGNORE INTO naturezas_rendimento (codigo, descricao, aplicavel_pf, aplicavel_pj, grupo, tabela_origem) VALUES
 ('10001', 'Remuneração de trabalho assalariado, aposentadoria, reserva ou reforma', 1, 0, 'Trabalho', '01'),
 ('10002', 'Décimo terceiro salário', 1, 0, 'Trabalho', '01'),
 ('10003', 'Diárias e ajuda de custo', 1, 0, 'Trabalho', '01'),
-('10004', 'Remuneração indireta', 1, 0, 'Trabalho', '01'),
 ('10005', 'Participação dos trabalhadores nos lucros ou resultados (PLR)', 1, 0, 'Trabalho', '01'),
-('10006', 'Verbas rescisórias - aviso prévio indenizado', 1, 0, 'Trabalho', '01'),
-('10007', 'Verbas rescisórias - férias indenizadas', 1, 0, 'Trabalho', '01'),
-('10008', 'Verbas rescisórias - demais verbas tributáveis', 1, 0, 'Trabalho', '01'),
 ('10009', 'Rendimentos recebidos acumuladamente (RRA)', 1, 0, 'Trabalho', '01'),
-('10010', 'Resgate de previdência complementar - PGBL', 1, 0, 'Trabalho', '01'),
-('10011', 'Resgate de previdência complementar - VGBL', 1, 0, 'Trabalho', '01'),
 ('12001', 'Pró-labore, remuneração de conselheiros e diretores', 1, 0, 'Serviços', '01'),
 ('12002', 'Honorários profissionais a autônomos', 1, 0, 'Serviços', '01'),
 ('12003', 'Comissões e corretagens', 1, 1, 'Serviços', '01'),
-('12004', 'Lucros e dividendos pagos', 1, 1, 'Serviços', '01'),
-('12005', 'Juros sobre capital próprio (JCP)', 1, 1, 'Serviços', '01'),
 ('12040', 'Aluguéis de bens imóveis', 1, 1, 'Serviços', '01'),
 ('12045', 'Royalties', 1, 1, 'Serviços', '01'),
 ('99001', 'Outros rendimentos não classificados', 1, 1, 'Outros', '01');
-
--- NOTA: A Tabela 4020 completa (203 códigos) para o R-4020 deve ser importada
--- separadamente. Ver arquivo `database/migrations/tabela4020_codigos.sql`.

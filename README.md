@@ -1,166 +1,48 @@
-# EFD REINF – Sistema Web PHP
+# EFD-Reinf Web
 
-Sistema web para geração e gestão de arquivos **EFD REINF** (Escrituração Fiscal Digital de Retenções e Outras Informações Fiscais), construído com **PHP 8.2**, **MySQL 8** e **Docker**.
+Sistema web para geração e transmissão de eventos EFD-Reinf conforme leiaute v2.1.2 da Receita Federal.
 
----
-
-## 🚀 Como Iniciar
-
-### Pré-requisitos
-- Docker + Docker Compose instalados
-
-### 1. Clone e configure
+## Rodar localmente
 
 ```bash
-git clone <seu-repo> efd-reinf
-cd efd-reinf
-cp .env.example .env
-# Edite o .env se necessário
+git clone https://github.com/robertolinsfilho/reinf.git
+cd reinf
+docker compose up -d --build
 ```
 
-### 2. Suba os containers
+Acesse `http://localhost` (login: `admin@efdreinf.com.br` / senha: `admin123`)
 
-```bash
-docker-compose up -d --build
-```
+## Rodar no GitHub Codespaces
 
-### 3. Acesse
+1. Abrir o repo no GitHub → botão verde `< > Code` → aba **Codespaces** → **Create codespace on main**
+2. Aguarde ~3 minutos (build + composer install)
+3. Codespaces abre automaticamente a porta 80 no navegador
+4. Login: `admin@efdreinf.com.br` / `admin123`
 
-| URL | Serviço |
-|-----|---------|
-| http://localhost | Sistema EFD REINF |
-| http://localhost:8080 | phpMyAdmin |
+### Primeira execução (Codespaces)
 
-### 4. Login padrão
+Após o container subir, cole o arquivo `database/migrations/tabela4020_codigos.sql` no phpMyAdmin (porta 8080) para importar os 203 códigos da Tabela 4020.
 
-| Campo | Valor |
-|-------|-------|
-| E-mail | admin@efdreinf.com.br |
-| Senha | admin123 |
+### URLs no Codespaces
 
-> ⚠️ Altere a senha após o primeiro acesso!
+- **App:** porta 80 (URL pública gerada pelo Codespaces)
+- **phpMyAdmin:** porta 8080
+- **MySQL:** porta 3306
 
----
+## Estrutura
 
-## 📂 Estrutura do Projeto
+- PHP 8.2 + MySQL 8 + Nginx (Docker Compose)
+- Arquitetura MVC com Repository pattern
+- Eventos suportados: R-1000, R-1070, R-2010, R-2020, R-2060, R-2099, R-4010, R-4020, R-4099, R-9000
+- Assinatura XMLDSig SHA-256 com certificado A1
+- Transmissão REST para webservice da RFB (produção/homologação)
 
-```
-efd-reinf/
-├── docker/
-│   ├── Dockerfile          # PHP 8.2 FPM
-│   └── nginx.conf          # Configuração Nginx
-├── public/
-│   ├── index.php           # Front controller
-│   ├── css/app.css
-│   └── uploads/            # Uploads e XMLs gerados
-├── src/
-│   ├── Controllers/        # Controllers da aplicação
-│   ├── Models/Database.php # Singleton PDO
-│   ├── Services/
-│   │   ├── ImportacaoService.php   # Leitura do Excel
-│   │   └── GeracaoXmlService.php   # Geração do XML REINF
-│   └── Views/              # Templates PHP
-├── database/
-│   └── migrations/init.sql # Schema completo do banco
-├── config/app.php
-├── composer.json
-└── docker-compose.yml
-```
+## Segurança para produção
 
----
+Antes de subir em produção:
 
-## 📋 Funcionalidades
-
-### ✅ Implementadas
-- **Autenticação** com sessão PHP e hash bcrypt
-- **Contribuintes** – CRUD completo
-- **Competências** – Períodos de apuração por contribuinte
-- **Evento R-2010** – Retenções INSS Contratados (entrada manual + importação Excel)
-- **Evento R-2020** – Retenções INSS Contratantes
-- **Evento R-2060** – CPRB com cálculo automático
-- **Importação Excel** – Leitura de .xlsx/.xls com PhpSpreadsheet
-- **Geração XML** – Arquivos R-1000, R-2010, R-2020, R-2050, R-2055, R-2060, R-9000
-- **Download** dos XMLs gerados
-- **Gestão de Usuários** (admin)
-- **Dashboard** com totalizadores
-
-### 🔜 Para implementar (próximos passos)
-- Validação de CNPJ/CPF
-- Exportação de relatórios em Excel/PDF
-- Envio por certificado digital A1 via webservice SPED
-- Histórico de transmissões
-- Múltiplos estabelecimentos por contribuinte
-
----
-
-## 📊 Layout das Planilhas Excel
-
-### R-2010 (Retenções INSS Contratados)
-| Coluna | Conteúdo |
-|--------|----------|
-| A | CNPJ do Prestador |
-| B | Razão Social |
-| C | Nº do Documento |
-| D | Data de Emissão (DD/MM/AAAA) |
-| E | Valor Bruto |
-| F | Valor Retenção |
-| G | Valor SENAR |
-
-### R-2020 (Retenções INSS Contratantes)
-| Coluna | Conteúdo |
-|--------|----------|
-| A | CNPJ do Tomador |
-| B | Razão Social |
-| C | Nº do Documento |
-| D | Data de Emissão |
-| E | Valor Bruto |
-| F | Valor Retenção |
-
-### R-2060 (CPRB)
-| Coluna | Conteúdo |
-|--------|----------|
-| A | CNAE |
-| B | Receita Bruta |
-| C | Exclusões |
-| D | Alíquota (%) |
-
-> Linha 1 é o cabeçalho (ignorada). Dados a partir da linha 2.
-
----
-
-## ⚙️ Configuração de Produção
-
-1. Edite `.env` com suas credenciais reais
-2. Altere `tpAmb` de `2` (homologação) para `1` (produção) no `GeracaoXmlService.php`
-3. Configure HTTPS no nginx
-4. Altere `APP_SECRET` para uma string aleatória segura
-
----
-
-## 🐳 Comandos úteis
-
-```bash
-# Subir
-docker-compose up -d
-
-# Ver logs
-docker-compose logs -f app
-
-# Acessar container PHP
-docker-compose exec app bash
-
-# Reinstalar composer
-docker-compose exec app composer install
-
-# Parar
-docker-compose down
-
-# Parar e remover dados do banco
-docker-compose down -v
-```
-
----
-
-## 📄 Licença
-
-Desenvolvido para uso interno. Adapte conforme necessário.
+1. Troque a senha do admin (via /perfil)
+2. Troque `APP_SECRET` no `.env`
+3. Troque `DB_PASS` e `MYSQL_ROOT_PASSWORD` no `docker-compose.yml`
+4. Configure certificado A1 em `/certificados`
+5. Mude `REINF_TP_AMB=1` (produção) apenas quando estiver pronto
