@@ -6,7 +6,7 @@
     <title><?= $pageTitle ?? 'EFD REINF' ?> – <?= $appName ?></title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.11.3/font/bootstrap-icons.min.css">
-    <link rel="stylesheet" href="<?= $baseUrl ?>/css/app.css">
+    <link rel="stylesheet" href="/css/app.css">
 </head>
 <body class="<?= isset($usuario) ? 'has-sidebar' : '' ?>">
 
