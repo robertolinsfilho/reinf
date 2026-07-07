@@ -28,13 +28,32 @@ class TransmissaoController extends BaseController
         $compId      = (int) $this->get('competencia_id');
         $competencia = $compId ? $this->competencias->findWithContribuinte($compId, $this->userId()) : null;
 
+       // Verifica certificado ativo no banco
+        $certRepo = new \App\Models\CertificadoRepository($this->db);
+        $certs = $certRepo->listAll();
+        $certInfo = null;
+        foreach ($certs as $c) {
+            if ($c['ativo']) {
+                $validade = strtotime($c['validade']);
+                $certInfo = [
+                    'valido'    => $validade > time(),
+                    'titular'   => $c['titular'] ?? '—',
+                    'cnpj'      => $c['cnpj_certificado'] ?? '—',
+                    'validade'  => date('d/m/Y', $validade),
+                    'expirado'  => $validade < time(),
+                    'dias_rest' => max(0, (int) ceil(($validade - time()) / 86400)),
+                ];
+                break;
+            }
+        }
+
         $this->view('pages/transmissao/index', [
-            'pageTitle'     => 'Transmissão SEFAZ',
-            'competencia'   => $competencia,
-            'arquivos'      => $compId ? $this->arquivos->listByCompetencia($compId) : [],
-            'historico'     => $this->logs->historico(),
-            'certInfo'      => (new AssinaturaService())->infoCertificado(),
-            'competenciaId' => $compId,
+            'pageTitle'      => 'Transmissão SEFAZ',
+            'competencia'    => $competencia,
+            'arquivos'       => $compId ? $this->arquivos->listByCompetencia($compId) : [],
+            'historico'      => $this->logs->historico(),
+            'certInfo'       => $certInfo,
+            'competenciaId'  => $compId,
         ]);
     }
 
@@ -64,8 +83,16 @@ class TransmissaoController extends BaseController
         }
 
         $service   = new TransmissaoService($this->db);
-        $certInfo  = (new AssinaturaService())->infoCertificado();
-        $resultado = ($certInfo['valido'] ?? false)
+       $certRepo = new \App\Models\CertificadoRepository($this->db);
+        $certs = $certRepo->listAll();
+        $temCertValido = false;
+        foreach ($certs as $c) {
+            if ($c['ativo'] && strtotime($c['validade']) > time()) {
+                $temCertValido = true;
+                break;
+            }
+        }
+        $resultado = $temCertValido
             ? $service->enviarLote($comp['cnpj'], $xmls, assinar: true)
             : $service->enviarSimulado($comp['cnpj'], $xmls);
 

@@ -15,7 +15,7 @@ class CertificadoController extends BaseController
         $this->repo = new CertificadoRepository($this->db);
     }
 
-    public function index(): void
+   public function index(): void
     {
         $this->requireLogin();
         $certs = $this->repo->listAll();
@@ -23,7 +23,18 @@ class CertificadoController extends BaseController
         $certAtivo = null;
         foreach ($certs as $c) {
             if ($c['ativo']) {
-                $certAtivo = (new AssinaturaService())->infoCertificado($c['caminho'], '');
+                // Usa dados já salvos no banco (não precisa reabrir o PFX)
+                $validade = strtotime($c['validade']);
+                $diasRest = max(0, (int) ceil(($validade - time()) / 86400));
+                $certAtivo = [
+                    'valido'    => $validade > time(),
+                    'titular'   => $c['titular'] ?? '—',
+                    'cnpj'      => $c['cnpj_certificado'] ?? '—',
+                    'emissao'   => date('d/m/Y', strtotime($c['created_at'])),
+                    'validade'  => date('d/m/Y', $validade),
+                    'expirado'  => $validade < time(),
+                    'dias_rest' => $diasRest,
+                ];
                 break;
             }
         }
@@ -63,7 +74,11 @@ class CertificadoController extends BaseController
         $validTo  = $certData['validTo_time_t'] ?? 0;
         $cnpjCert = '';
 
-        if (preg_match('/\d{14}/', $certData['subject']['OU'] ?? '', $m)) {
+        $ouField = $certData['subject']['OU'] ?? '';
+        if (is_array($ouField)) {
+            $ouField = implode(' ', $ouField);
+        }
+        if (preg_match('/\d{14}/', $ouField, $m)) {
             $cnpjCert = $m[0];
         }
 
