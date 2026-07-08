@@ -5,6 +5,9 @@ services:
       dockerfile: docker/Dockerfile
     container_name: efd_reinf_app
     restart: unless-stopped
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
     volumes:
       - .:/var/www/html
       - ./public/uploads:/var/www/html/public/uploads

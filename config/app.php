@@ -27,13 +27,13 @@ return [
         'cert_path'  => $_ENV['REINF_CERT_PATH'] ?? __DIR__ . '/../storage/certs/',
         'cert_pass'  => $_ENV['REINF_CERT_PASS'] ?? '',
         // URLs dos webservices REST (v2)
-       'ws_envio' => [
-            1 => 'https://reinf.receita.economia.gov.br/recepcao/lotes',
-            2 => 'https://preprodefdreinf.receita.economia.gov.br/recepcao/lotes',
+        'ws_envio' => [
+            1 => 'https://reinf.receita.economia.gov.br/recepcao/lotes/',
+            2 => 'https://pre-reinf.receita.economia.gov.br/recepcao/lotes/',
         ],
         'ws_consulta' => [
-            1 => 'https://reinf.receita.economia.gov.br/consulta/lotes',
-            2 => 'https://preprodefdreinf.receita.economia.gov.br/consulta/lotes',
+            1 => 'https://reinf.receita.economia.gov.br/consulta/lotes/',
+            2 => 'https://pre-reinf.receita.economia.gov.br/consulta/lotes/',
         ],
         'user_agent' => 'EFD-REINF-WEB/1.0 (github.com/robertolinsfilho/reinf)',
     ],
