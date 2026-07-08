@@ -155,14 +155,14 @@ class AssinaturaService
         $dom->loadXML($xml);
 
         $xpath = new \DOMXPath($dom);
-        $nodes = $xpath->query('//*[@id]');
-
+        $nodes = $xpath->query('//*[@Id]');
+        
         if ($nodes->length === 0) {
             throw new \RuntimeException("XML não contém elemento com atributo 'id' para assinar.");
         }
 
         $nodeToSign = $nodes->item(0);
-        $refUri     = '#' . $nodeToSign->getAttribute('id');
+        $refUri     = '#' . $nodeToSign->getAttribute('Id');
 
         $canonical = $nodeToSign->C14N(false, false);
         $digestValue = base64_encode(hash('sha256', $canonical, true));

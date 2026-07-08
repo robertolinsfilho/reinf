@@ -121,7 +121,7 @@ class TransmissaoService
         $eventosStr = '';
         foreach ($eventosXml as $i => $xml) {
             $xml = preg_replace('/<\?xml[^?]+\?>\s*/', '', $xml);
-            $eventosStr .= "      <evento id=\"evt_{$i}\">\n{$xml}\n      </evento>\n";
+            $eventosStr .= "      <evento Id=\"evt_{$i}\">\n{$xml}\n      </evento>\n";
         }
 
         return '<?xml version="1.0" encoding="UTF-8"?>' . "\n"

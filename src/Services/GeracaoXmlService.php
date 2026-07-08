@@ -112,7 +112,7 @@ class GeracaoXmlService
     {
         return '<?xml version="1.0" encoding="UTF-8"?>' . "\n"
              . '<Reinf xmlns="http://www.reinf.esocial.gov.br/schemas/' . $namespace . '/v2_01_02">' . "\n"
-             . '    <' . $eventoTag . ' id="' . $id . '">' . "\n"
+             . '    <' . $eventoTag . ' Id="' . $id . '">' . "\n"
              . $conteudo . "\n"
              . '    </' . $eventoTag . '>' . "\n"
              . '</Reinf>';
