@@ -91,8 +91,16 @@ class CertificadoController extends BaseController
 
         $contribId = (int) $this->post('contribuinte_id', 1);
         $this->repo->desativarTodos($contribId);
-        $this->repo->criar($contribId, $file['name'], $destFile, $cnpjCert, $cn, date('Y-m-d', $validTo));
+        $senhaEnc = $this->encryptSenha($senha);
+        $this->repo->criarComSenha($contribId, $file['name'], $destFile, $senhaEnc, $cnpjCert, $cn, date('Y-m-d', $validTo));
 
         $this->redirect('/certificados', "Certificado '{$cn}' importado! Válido até " . date('d/m/Y', $validTo), 'sucesso');
+    }
+    private function encryptSenha(string $senha): string
+    {
+        $chave = $this->config['app']['secret'] ?? 'default_key_change_me';
+        $iv    = openssl_random_pseudo_bytes(16);
+        $enc   = openssl_encrypt($senha, 'AES-256-CBC', $chave, 0, $iv);
+        return base64_encode($iv . $enc);
     }
 }

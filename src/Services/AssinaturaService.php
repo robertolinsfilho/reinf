@@ -24,6 +24,20 @@ class AssinaturaService
      */
     public function assinar(string $xml, ?string $pfxPath = null, ?string $pfxPass = null): string
     {
+        // Se senha não veio explícita, tenta pegar do banco (certificado ativo)
+        if (!$pfxPath || !$pfxPass) {
+            $config = \App\Models\AppConfig::get();
+            $db = \App\Models\Database::getInstance();
+            $repo = new \App\Models\CertificadoRepository($db);
+            $certAtivo = $repo->findAtivo();
+            if ($certAtivo) {
+                $pfxPath = $pfxPath ?: $certAtivo['caminho'];
+                if (!$pfxPass && !empty($certAtivo['senha_encrypted'])) {
+                    $pfxPass = $this->decryptSenha($certAtivo['senha_encrypted']);
+                }
+            }
+        }
+
         $pfxPath = $pfxPath ?: $this->findCertificado();
         $pfxPass = $pfxPass ?: $this->certPass;
 
@@ -174,5 +188,14 @@ class AssinaturaService
         $nodeToSign->appendChild($sigFrag);
 
         return $dom->saveXML();
+    }
+    private function decryptSenha(string $encrypted): string
+    {
+        $config = \App\Models\AppConfig::get();
+        $chave = $config['app']['secret'] ?? 'default_key_change_me';
+        $data  = base64_decode($encrypted);
+        $iv    = substr($data, 0, 16);
+        $enc   = substr($data, 16);
+        return openssl_decrypt($enc, 'AES-256-CBC', $chave, 0, $iv) ?: '';
     }
 }

@@ -28,4 +28,22 @@ class CertificadoRepository extends Repository
             'ativo'            => 1,
         ]);
     }
+    public function criarComSenha(int $contribId, string $nomeArq, string $caminho, string $senhaEnc, string $cnpj, string $titular, string $validade): int
+    {
+        return $this->insert([
+            'contribuinte_id'  => $contribId,
+            'nome_arquivo'     => $nomeArq,
+            'caminho'          => $caminho,
+            'senha_encrypted'  => $senhaEnc,
+            'cnpj_certificado' => $cnpj,
+            'titular'          => $titular,
+            'validade'         => $validade,
+            'ativo'            => 1,
+        ]);
+    }
+
+    public function findAtivo(): ?array
+    {
+        return $this->queryOne("SELECT * FROM certificados WHERE ativo = 1 ORDER BY id DESC LIMIT 1");
+    }
 }
