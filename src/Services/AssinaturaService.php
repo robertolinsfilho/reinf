@@ -155,7 +155,7 @@ class AssinaturaService
         $dom->loadXML($xml);
 
         $xpath = new \DOMXPath($dom);
-        $nodes = $xpath->query('//*[@Id]');
+        $nodes = $xpath->query('//*[@id]');
         
         if ($nodes->length === 0) {
             throw new \RuntimeException("XML não contém elemento com atributo 'id' para assinar.");

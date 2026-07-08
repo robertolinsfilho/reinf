@@ -4,7 +4,7 @@ namespace App\Services;
 
 /**
  * Geração de XML EFD-Reinf conforme leiaute v2.1.2
- * Namespace: http://www.reinf.esocial.gov.br/schemas/{evento}/v2_01_02
+ * Namespace: http://www.reinf.esocial.gov.br/schemas/{namespace}/v2_01_02
  */
 class GeracaoXmlService
 {
@@ -34,7 +34,6 @@ class GeracaoXmlService
     {
         $arquivos = [];
 
-        // Setar contexto de retificação para uso nos métodos privados
         $this->indRetif = $indRetif;
         $this->nrRecibo = $nrRecibo;
 
@@ -112,7 +111,7 @@ class GeracaoXmlService
     {
         return '<?xml version="1.0" encoding="UTF-8"?>' . "\n"
              . '<Reinf xmlns="http://www.reinf.esocial.gov.br/schemas/' . $namespace . '/v2_01_02">' . "\n"
-             . '    <' . $eventoTag . ' Id="' . $id . '">' . "\n"
+             . '    <' . $eventoTag . ' id="' . $id . '">' . "\n"
              . $conteudo . "\n"
              . '    </' . $eventoTag . '>' . "\n"
              . '</Reinf>';
@@ -156,7 +155,9 @@ class GeracaoXmlService
         return $this->envelope('evtInfoContribuinte', 'evtInfoContribuinte', $id, $body);
     }
 
-      private function gerarR1070(array $comp): string
+    // ─── R-1070 · Tabela de Processos ────────────────────────
+
+    private function gerarR1070(array $comp): string
     {
         $cnpj = preg_replace('/\D/', '', $comp['cnpj']);
         $id   = $this->gerarId($cnpj);
@@ -224,10 +225,9 @@ class GeracaoXmlService
         $registros = $stmt->fetchAll();
 
         if (empty($registros)) {
-            throw new \RuntimeException("Nenhum registro R-2010 encontrado para esta competência.");
+            throw new \RuntimeException("Nenhum registro R-2010 encontrado.");
         }
 
-        // Agrupar por prestador
         $porPrestador = [];
         foreach ($registros as $r) {
             $cnpjPrest = preg_replace('/\D/', '', $r['cnpj_prestador']);
@@ -238,7 +238,6 @@ class GeracaoXmlService
         foreach ($porPrestador as $cnpjPrest => $nfs) {
             $totalBruto  = array_sum(array_column($nfs, 'valor_bruto'));
             $totalRet    = array_sum(array_column($nfs, 'valor_retencao'));
-            $tipoPrest   = $nfs[0]['tipo_insc_prestador'] ?? '1';
 
             $nfsXml = '';
             foreach ($nfs as $nf) {
@@ -280,7 +279,7 @@ class GeracaoXmlService
               . $prestadoresXml
               . "        </ideEstabObra>";
 
-        return $this->envelope('evtServTom', 'evtServTom', $id, $body);
+        return $this->envelope('evtServTom', 'evtTomadorServicos', $id, $body);
     }
 
     // ─── R-2020 · Retenção INSS Serviços Prestados ───────────
@@ -349,7 +348,7 @@ class GeracaoXmlService
               . $tomadoresXml
               . "        </ideEstabPrest>";
 
-        return $this->envelope('evtServPrest', 'evtServPrest', $id, $body);
+        return $this->envelope('evtServPrest', 'evtServicosPrestados', $id, $body);
     }
 
     // ─── R-2060 · CPRB ───────────────────────────────────────
@@ -390,7 +389,7 @@ class GeracaoXmlService
               . $atividadesXml
               . "        </ideEstab>";
 
-        return $this->envelope('evtInfoCPRB', 'evtCPRB', $id, $body);
+        return $this->envelope('evtCPRB', 'evtCPRB', $id, $body);
     }
 
     // ─── R-2099 · Fechamento série R-2000 ────────────────────
@@ -418,7 +417,7 @@ class GeracaoXmlService
               . "            <evtAquis>N</evtAquis>\n"
               . "        </infoFech>";
 
-        return $this->envelope('evtFechaEvPer', 'evtFechamento', $id, $body);
+        return $this->envelope('evtFechaEvPer', 'evtFechaEvPer', $id, $body);
     }
 
     // ─── R-4010 · Pagamentos PF (IRRF) ──────────────────────
@@ -436,7 +435,6 @@ class GeracaoXmlService
             throw new \RuntimeException("Nenhum registro R-4010 encontrado.");
         }
 
-        // Agrupar por beneficiário
         $porBenef = [];
         foreach ($registros as $r) {
             $cpf = preg_replace('/\D/', '', $r['cpf_beneficiario']);
@@ -480,10 +478,12 @@ class GeracaoXmlService
               . $benefXml
               . "        </ideEstab>";
 
-        return $this->envelope('evtRetPF', 'evtRetPF', $id, $body);
+        return $this->envelope('evtRetPF', 'evt4010PagtoBeneficiarioPF', $id, $body);
     }
 
     // ─── R-4020 · Pagamentos PJ (IRRF/CSLL/COFINS/PIS) ──────
+
+   // ─── R-4020 · Pagamentos PJ (IRRF/CSLL/COFINS/PIS) ──────
 
     private function gerarR4020(array $comp): string
     {
@@ -502,86 +502,78 @@ class GeracaoXmlService
             throw new \RuntimeException("Nenhum registro R-4020 encontrado.");
         }
 
-        // Agrupa por CNPJ beneficiário + natureza (cada combinação vira um <ideBenef>)
-        $grupos = [];
+        // Agrupa por CNPJ beneficiário (cada beneficiário terá seus idePgto por natureza)
+        $porBenef = [];
         foreach ($registros as $r) {
             $cnpjBenef = preg_replace('/\D/', '', $r['cnpj_beneficiario']);
-            $natRend   = $r['cod_tipo_servico'] ?? $r['natureza_rendimento'] ?? '00000';
-            $chave     = "{$cnpjBenef}|{$natRend}";
-            $grupos[$chave][] = $r;
+            $porBenef[$cnpjBenef][] = $r;
         }
 
         $benefXml = '';
-        foreach ($grupos as $chave => $pagtos) {
-            [$cnpjBenef, $natRend] = explode('|', $chave);
-            $p0 = $pagtos[0];
+        foreach ($porBenef as $cnpjBenef => $pagtosBenef) {
+            $nome = $pagtosBenef[0]['razao_social_beneficiario'] ?? '';
 
-            $pgtoXml = '';
-            foreach ($pagtos as $p) {
-                $vBruto  = (float) ($p['valor_bruto'] ?? 0);
-                $vBaseIR = (float) ($p['valor_base_ir'] ?? $vBruto);
-                $vIR     = (float) ($p['valor_ir'] ?? 0);
-                $vCSLL   = (float) ($p['valor_csll'] ?? 0);
-                $vCofins = (float) ($p['valor_cofins'] ?? 0);
-                $vPIS    = (float) ($p['valor_pis'] ?? 0);
-                $vCSRF   = (float) ($p['vl_csrf_agregado'] ?? 0);
-                $numDoc  = htmlspecialchars((string)($p['num_nfs'] ?? ''));
-                $obs     = htmlspecialchars((string)($p['observacoes'] ?? ''));
+            // Dentro do beneficiário, agrupa por natureza
+            $porNatureza = [];
+            foreach ($pagtosBenef as $p) {
+                $nat = $p['cod_tipo_servico'] ?? $p['natureza_rendimento'] ?? '00000';
+                $porNatureza[$nat][] = $p;
+            }
 
-                $pgtoXml .= "                    <infoPgto>\n"
-                          . "                        <dtFG>" . $p['data_pagamento'] . "</dtFG>\n";
-                if ($numDoc) {
-                    $pgtoXml .= "                        <numDocto>{$numDoc}</numDocto>\n";
-                }
-                $pgtoXml .= "                        <vlrBruto>" . $this->fmtVal($vBruto) . "</vlrBruto>\n"
-                          . "                        <vlrBaseIR>" . $this->fmtVal($vBaseIR) . "</vlrBaseIR>\n"
-                          . "                        <vlrIR>" . $this->fmtVal($vIR) . "</vlrIR>\n";
+            $idePgtoXml = '';
+            foreach ($porNatureza as $natRend => $pagtos) {
+                $infoPgtoXml = '';
+                foreach ($pagtos as $p) {
+                    $vBruto  = (float) ($p['valor_bruto'] ?? 0);
+                    $vBaseIR = (float) ($p['valor_base_ir'] ?? $vBruto);
+                    $vIR     = (float) ($p['valor_ir'] ?? 0);
+                    $vCSLL   = (float) ($p['valor_csll'] ?? 0);
+                    $vCofins = (float) ($p['valor_cofins'] ?? 0);
+                    $vPIS    = (float) ($p['valor_pis'] ?? 0);
+                    $indJud  = !empty($p['indicador_judicial']) ? 'S' : 'N';
 
-                // CSRF (Contribuições Sociais Retidas na Fonte)
-                if ($vCSRF > 0) {
-                    $pgtoXml .= "                        <vlrAgregCSRF>" . $this->fmtVal($vCSRF) . "</vlrAgregCSRF>\n";
-                }
-                if ($vCSLL > 0) {
-                    $pgtoXml .= "                        <vlrBaseCSLL>" . $this->fmtVal($vBruto) . "</vlrBaseCSLL>\n"
-                              . "                        <vlrCSLL>" . $this->fmtVal($vCSLL) . "</vlrCSLL>\n";
-                }
-                if ($vCofins > 0) {
-                    $pgtoXml .= "                        <vlrBaseCofins>" . $this->fmtVal($vBruto) . "</vlrBaseCofins>\n"
-                              . "                        <vlrCofins>" . $this->fmtVal($vCofins) . "</vlrCofins>\n";
-                }
-                if ($vPIS > 0) {
-                    $pgtoXml .= "                        <vlrBasePP>" . $this->fmtVal($vBruto) . "</vlrBasePP>\n"
-                              . "                        <vlrPP>" . $this->fmtVal($vPIS) . "</vlrPP>\n";
-                }
+                    $infoPgtoXml .= "                        <infoPgto>\n"
+                                  . "                            <dtFG>" . $p['data_pagamento'] . "</dtFG>\n"
+                                  . "                            <vlrBruto>" . $this->fmtVal($vBruto) . "</vlrBruto>\n"
+                                  . "                            <indJud>{$indJud}</indJud>\n";
 
-                // Se judicial, adicionar bloco de processo
-                if (!empty($p['indicador_judicial']) && !empty($p['numero_processo'])) {
-                    $pgtoXml .= "                        <infoProcRet>\n"
-                              . "                            <tpProcRet>1</tpProcRet>\n"
-                              . "                            <nrProcRet>" . htmlspecialchars($p['numero_processo']) . "</nrProcRet>\n"
-                              . "                            <codSusp></codSusp>\n"
-                              . "                        </infoProcRet>\n";
-                }
+                    // Bloco de retenções
+                    $temRetencao = ($vIR > 0 || $vCSLL > 0 || $vCofins > 0 || $vPIS > 0);
+                    if ($temRetencao) {
+                        $infoPgtoXml .= "                            <retencoes>\n"
+                                      . "                                <vlrBaseIR>" . $this->fmtVal($vBaseIR) . "</vlrBaseIR>\n"
+                                      . "                                <vlrIR>" . $this->fmtVal($vIR) . "</vlrIR>\n";
+                        if ($vCSLL > 0) {
+                            $infoPgtoXml .= "                                <vlrBaseCSLL>" . $this->fmtVal($vBruto) . "</vlrBaseCSLL>\n"
+                                          . "                                <vlrCSLL>" . $this->fmtVal($vCSLL) . "</vlrCSLL>\n";
+                        }
+                        if ($vCofins > 0) {
+                            $infoPgtoXml .= "                                <vlrBaseCofins>" . $this->fmtVal($vBruto) . "</vlrBaseCofins>\n"
+                                          . "                                <vlrCofins>" . $this->fmtVal($vCofins) . "</vlrCofins>\n";
+                        }
+                        if ($vPIS > 0) {
+                            $infoPgtoXml .= "                                <vlrBasePP>" . $this->fmtVal($vBruto) . "</vlrBasePP>\n"
+                                          . "                                <vlrPP>" . $this->fmtVal($vPIS) . "</vlrPP>\n";
+                        }
+                        $infoPgtoXml .= "                            </retencoes>\n";
+                    }
 
-                if ($obs) {
-                    $pgtoXml .= "                        <observ>{$obs}</observ>\n";
+                    $infoPgtoXml .= "                        </infoPgto>\n";
                 }
 
-                $pgtoXml .= "                    </infoPgto>\n";
+                $idePgtoXml .= "                    <idePgto>\n"
+                             . "                        <natRend>{$natRend}</natRend>\n"
+                             . $infoPgtoXml
+                             . "                    </idePgto>\n";
             }
 
             $benefXml .= "                <ideBenef>\n"
                        . "                    <cnpjBenef>{$cnpjBenef}</cnpjBenef>\n"
-                       . "                    <nmBenef>" . htmlspecialchars($p0['razao_social_beneficiario'] ?? '') . "</nmBenef>\n"
-                       . "                    <isenImun>0</isenImun>\n"
-                       . "                    <ideEvtAdic>\n"
-                       . "                        <natRend>{$natRend}</natRend>\n"
-                       . "                    </ideEvtAdic>\n"
-                       . $pgtoXml
+                       . "                    <nmBenef>" . htmlspecialchars($nome) . "</nmBenef>\n"
+                       . $idePgtoXml
                        . "                </ideBenef>\n";
         }
 
-        // Determina CNPJ do estabelecimento (contribuinte pagador) — pode ser diferente do contribuinte matriz
         $cnpjEstab = $registros[0]['cnpj_contribuinte'] ?? $cnpj;
         $cnpjEstab = preg_replace('/\D/', '', $cnpjEstab) ?: $cnpj;
 
@@ -593,7 +585,7 @@ class GeracaoXmlService
               . $benefXml
               . "        </ideEstab>";
 
-        return $this->envelope('evtRetPJ', 'evtRetPJ', $id, $body);
+        return $this->envelope('evtRetPJ', 'evt4020PagtoBeneficiarioPJ', $id, $body);
     }
 
     // ─── R-4099 · Fechamento série R-4000 ────────────────────
@@ -615,7 +607,7 @@ class GeracaoXmlService
               . "            <fechRet>S</fechRet>\n"
               . "        </infoFech>";
 
-        return $this->envelope('evtFechamento', 'evtFech', $id, $body);
+        return $this->envelope('evtFechaRetPgtos', 'evtFechaRetPgtos', $id, $body);
     }
 
     // ─── R-9000 · Exclusão de evento ─────────────────────────
@@ -629,7 +621,7 @@ class GeracaoXmlService
         $tpEvt    = $comp['tipo_evento_exclusao'] ?? 'R-2010';
 
         if (empty($nrRecibo)) {
-            throw new \RuntimeException("R-9000 exige número do recibo do evento a excluir. Informe o recibo.");
+            throw new \RuntimeException("R-9000 exige número do recibo do evento a excluir.");
         }
 
         $body = "        <ideEvento>\n"
