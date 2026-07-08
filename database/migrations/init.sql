@@ -201,6 +201,7 @@ CREATE TABLE IF NOT EXISTS certificados (
     contribuinte_id INT NOT NULL,
     nome_arquivo VARCHAR(255),
     caminho VARCHAR(500),
+    senha_encrypted VARCHAR(500) NULL,
     cnpj_certificado VARCHAR(14),
     titular VARCHAR(255),
     validade DATE,

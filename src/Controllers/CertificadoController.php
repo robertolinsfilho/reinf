@@ -15,7 +15,7 @@ class CertificadoController extends BaseController
         $this->repo = new CertificadoRepository($this->db);
     }
 
-   public function index(): void
+    public function index(): void
     {
         $this->requireLogin();
         $certs = $this->repo->listAll();
@@ -23,7 +23,6 @@ class CertificadoController extends BaseController
         $certAtivo = null;
         foreach ($certs as $c) {
             if ($c['ativo']) {
-                // Usa dados já salvos no banco (não precisa reabrir o PFX)
                 $validade = strtotime($c['validade']);
                 $diasRest = max(0, (int) ceil(($validade - time()) / 86400));
                 $certAtivo = [
@@ -74,6 +73,7 @@ class CertificadoController extends BaseController
         $validTo  = $certData['validTo_time_t'] ?? 0;
         $cnpjCert = '';
 
+        // OU pode ser string ou array (múltiplas OUs)
         $ouField = $certData['subject']['OU'] ?? '';
         if (is_array($ouField)) {
             $ouField = implode(' ', $ouField);
@@ -90,15 +90,17 @@ class CertificadoController extends BaseController
         move_uploaded_file($file['tmp_name'], $destFile);
 
         $contribId = (int) $this->post('contribuinte_id', 1);
+        $senhaEnc  = $this->encryptSenha($senha);
+
         $this->repo->desativarTodos($contribId);
-        $senhaEnc = $this->encryptSenha($senha);
         $this->repo->criarComSenha($contribId, $file['name'], $destFile, $senhaEnc, $cnpjCert, $cn, date('Y-m-d', $validTo));
 
         $this->redirect('/certificados', "Certificado '{$cn}' importado! Válido até " . date('d/m/Y', $validTo), 'sucesso');
     }
+
     private function encryptSenha(string $senha): string
     {
-        $chave = $this->config['app']['secret'] ?? 'default_key_change_me';
+        $chave = $this->config['app']['secret'] ?? 'default_key_change_me_in_production';
         $iv    = openssl_random_pseudo_bytes(16);
         $enc   = openssl_encrypt($senha, 'AES-256-CBC', $chave, 0, $iv);
         return base64_encode($iv . $enc);

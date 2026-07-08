@@ -24,10 +24,9 @@ class AssinaturaService
      */
     public function assinar(string $xml, ?string $pfxPath = null, ?string $pfxPass = null): string
     {
-        // Se senha não veio explícita, tenta pegar do banco (certificado ativo)
+        // Se não veio explícito, tenta do banco (certificado ativo)
         if (!$pfxPath || !$pfxPass) {
-            $config = \App\Models\AppConfig::get();
-            $db = \App\Models\Database::getInstance();
+            $db   = \App\Models\Database::getInstance();
             $repo = new \App\Models\CertificadoRepository($db);
             $certAtivo = $repo->findAtivo();
             if ($certAtivo) {
@@ -55,7 +54,6 @@ class AssinaturaService
         $privateKey = $certs['pkey'];
         $publicCert = $certs['cert'];
 
-        // Extrair dados do certificado
         $certData = openssl_x509_parse($publicCert);
         $validTo  = $certData['validTo_time_t'] ?? 0;
 
@@ -71,6 +69,23 @@ class AssinaturaService
      */
     public function infoCertificado(?string $pfxPath = null, ?string $pfxPass = null): array
     {
+        // Se não veio explícito, tenta do banco (certificado ativo)
+        if (!$pfxPath || !$pfxPass) {
+            try {
+                $db   = \App\Models\Database::getInstance();
+                $repo = new \App\Models\CertificadoRepository($db);
+                $certAtivo = $repo->findAtivo();
+                if ($certAtivo) {
+                    $pfxPath = $pfxPath ?: $certAtivo['caminho'];
+                    if (!$pfxPass && !empty($certAtivo['senha_encrypted'])) {
+                        $pfxPass = $this->decryptSenha($certAtivo['senha_encrypted']);
+                    }
+                }
+            } catch (\Exception $e) {
+                // segue com fallbacks
+            }
+        }
+
         $pfxPath = $pfxPath ?: $this->findCertificado();
         $pfxPass = $pfxPass ?: $this->certPass;
 
@@ -82,17 +97,20 @@ class AssinaturaService
         $certs = [];
 
         if (!openssl_pkcs12_read($pfxContent, $certs, $pfxPass)) {
-            return ['valido' => false, 'erro' => 'Senha inválida'];
+            return ['valido' => false, 'erro' => 'Senha inválida ou não armazenada'];
         }
 
-        $data = openssl_x509_parse($certs['cert']);
-        $cn   = $data['subject']['CN'] ?? '—';
+        $data      = openssl_x509_parse($certs['cert']);
+        $cn        = $data['subject']['CN'] ?? '—';
         $validFrom = $data['validFrom_time_t'] ?? 0;
         $validTo   = $data['validTo_time_t'] ?? 0;
 
-        // Extrair CNPJ do certificado (está no campo OU ou na extensão)
         $cnpj = '';
-        if (preg_match('/\d{14}/', $data['subject']['OU'] ?? '', $m)) {
+        $ouField = $data['subject']['OU'] ?? '';
+        if (is_array($ouField)) {
+            $ouField = implode(' ', $ouField);
+        }
+        if (preg_match('/\d{14}/', $ouField, $m)) {
             $cnpj = $m[0];
         }
 
@@ -105,6 +123,16 @@ class AssinaturaService
             'expirado'   => $validTo < time(),
             'dias_rest'  => max(0, (int) ceil(($validTo - time()) / 86400)),
         ];
+    }
+
+    private function decryptSenha(string $encrypted): string
+    {
+        $config = \App\Models\AppConfig::get();
+        $chave  = $config['app']['secret'] ?? 'default_key_change_me_in_production';
+        $data   = base64_decode($encrypted);
+        $iv     = substr($data, 0, 16);
+        $enc    = substr($data, 16);
+        return openssl_decrypt($enc, 'AES-256-CBC', $chave, 0, $iv) ?: '';
     }
 
     private function findCertificado(): ?string
@@ -126,7 +154,6 @@ class AssinaturaService
         $dom->formatOutput = false;
         $dom->loadXML($xml);
 
-        // Encontrar o elemento que tem atributo "id" (o evento)
         $xpath = new \DOMXPath($dom);
         $nodes = $xpath->query('//*[@id]');
 
@@ -137,13 +164,9 @@ class AssinaturaService
         $nodeToSign = $nodes->item(0);
         $refUri     = '#' . $nodeToSign->getAttribute('id');
 
-        // Canonicalizar o nó
         $canonical = $nodeToSign->C14N(false, false);
-
-        // Digest (SHA-256)
         $digestValue = base64_encode(hash('sha256', $canonical, true));
 
-        // Montar SignedInfo
         $signedInfo  = '<SignedInfo xmlns="http://www.w3.org/2000/09/xmldsig#">';
         $signedInfo .= '<CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"/>';
         $signedInfo .= '<SignatureMethod Algorithm="http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"/>';
@@ -157,7 +180,6 @@ class AssinaturaService
         $signedInfo .= '</Reference>';
         $signedInfo .= '</SignedInfo>';
 
-        // Canonicalizar SignedInfo e assinar
         $siDom = new \DOMDocument();
         $siDom->loadXML($signedInfo);
         $siCanonical = $siDom->documentElement->C14N(false, false);
@@ -168,10 +190,8 @@ class AssinaturaService
         }
         $signatureValue = base64_encode($signature);
 
-        // Extrair certificado X509 (sem header/footer)
         $x509 = preg_replace('/(-----BEGIN CERTIFICATE-----|-----END CERTIFICATE-----|\s)/', '', $publicCert);
 
-        // Montar Signature
         $signatureXml  = '<Signature xmlns="http://www.w3.org/2000/09/xmldsig#">';
         $signatureXml .= $signedInfo;
         $signatureXml .= '<SignatureValue>' . $signatureValue . '</SignatureValue>';
@@ -182,20 +202,10 @@ class AssinaturaService
         $signatureXml .= '</KeyInfo>';
         $signatureXml .= '</Signature>';
 
-        // Inserir Signature no nó assinado
         $sigFrag = $dom->createDocumentFragment();
         $sigFrag->appendXML($signatureXml);
         $nodeToSign->appendChild($sigFrag);
 
         return $dom->saveXML();
-    }
-    private function decryptSenha(string $encrypted): string
-    {
-        $config = \App\Models\AppConfig::get();
-        $chave = $config['app']['secret'] ?? 'default_key_change_me';
-        $data  = base64_decode($encrypted);
-        $iv    = substr($data, 0, 16);
-        $enc   = substr($data, 16);
-        return openssl_decrypt($enc, 'AES-256-CBC', $chave, 0, $iv) ?: '';
     }
 }
