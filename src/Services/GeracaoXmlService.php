@@ -118,7 +118,8 @@ class GeracaoXmlService
 
     private function fmtVal(float|string|null $valor): string
     {
-        return number_format((float) ($valor ?? 0), 2, ',', '');
+        // XSD EFD-Reinf: separador decimal é ponto (ex: 1234.56)
+        return number_format((float) ($valor ?? 0), 2, '.', '');
     }
 
     // ═══ R-1000 ═══════════════════════════════════════

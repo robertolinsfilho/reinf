@@ -61,6 +61,11 @@ class AssinaturaService
             throw new \RuntimeException("Certificado digital expirado em " . date('d/m/Y', $validTo));
         }
 
+        // Evita Signature duplicada (geração + transmissão)
+        if (preg_match('/<Signature[\s>]/', $xml)) {
+            return $xml;
+        }
+
         return $this->xmlDsig($xml, $privateKey, $publicCert);
     }
 
@@ -204,9 +209,9 @@ class AssinaturaService
 
         $sigFrag = $dom->createDocumentFragment();
         $sigFrag->appendXML($signatureXml);
-        // Assinatura vai como IRMÃO de <evtRetPJ>, filha de <Reinf>
+        // XSD: Signature é filha de <Reinf>, irmã do evento — não dentro do evtXxx
         $dom->documentElement->appendChild($sigFrag);
 
-        return $dom->saveXML($dom);
+        return $dom->saveXML();
     }
 }

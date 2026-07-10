@@ -166,6 +166,58 @@
                     <?php endif; ?>
                 </div>
                 <?php endif; ?>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-sm table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>CNPJ Benef.</th>
+                            <th>Nat.</th>
+                            <th>Data FG</th>
+                            <th class="text-end">Bruto</th>
+                            <th class="text-end">IR</th>
+                            <th class="text-end">CSLL</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php if (empty($registros)): ?>
+                        <tr>
+                            <td colspan="7" class="text-center text-muted py-4">
+                                Nenhum registro. Adicione pagamentos PJ ou importe via Excel.
+                            </td>
+                        </tr>
+                        <?php else: foreach ($registros as $r): ?>
+                        <tr>
+                            <td class="font-monospace small"><?= htmlspecialchars($r['cnpj_beneficiario']) ?></td>
+                            <td class="font-monospace small"><?= htmlspecialchars($r['cod_tipo_servico'] ?? $r['natureza_rendimento'] ?? '') ?></td>
+                            <td class="small"><?= !empty($r['data_pagamento']) ? date('d/m/Y', strtotime($r['data_pagamento'])) : '' ?></td>
+                            <td class="text-end small">R$ <?= number_format((float)$r['valor_bruto'], 2, ',', '.') ?></td>
+                            <td class="text-end small text-danger">R$ <?= number_format((float)$r['valor_ir'], 2, ',', '.') ?></td>
+                            <td class="text-end small">R$ <?= number_format((float)($r['valor_csll'] ?? 0), 2, ',', '.') ?></td>
+                            <td>
+                                <form action="/eventos/r4020/excluir" method="POST" onsubmit="return confirm('Excluir?')">
+                                    <input type="hidden" name="id" value="<?= (int)$r['id'] ?>">
+                                    <input type="hidden" name="competencia_id" value="<?= (int)$competencia['id'] ?>">
+                                    <button type="submit" class="btn btn-outline-danger btn-sm py-0 px-1"><i class="bi bi-trash3"></i></button>
+                                </form>
+                            </td>
+                        </tr>
+                        <?php endforeach; endif; ?>
+                    </tbody>
+                    <?php if (!empty($registros)): ?>
+                    <tfoot class="table-light fw-bold">
+                        <tr>
+                            <td colspan="3" class="text-end small">Total página:</td>
+                            <td class="text-end small">R$ <?= number_format(array_sum(array_column($registros, 'valor_bruto')), 2, ',', '.') ?></td>
+                            <td class="text-end small text-danger">R$ <?= number_format(array_sum(array_column($registros, 'valor_ir')), 2, ',', '.') ?></td>
+                            <td class="text-end small">R$ <?= number_format(array_sum(array_column($registros, 'valor_csll')), 2, ',', '.') ?></td>
+                            <td></td>
+                        </tr>
+                    </tfoot>
+                    <?php endif; ?>
+                </table>
+            </div>
         </div>
     </div>
 </div>

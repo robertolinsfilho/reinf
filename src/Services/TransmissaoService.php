@@ -51,7 +51,7 @@ class TransmissaoService
         $retorno = $this->httpPost($url, $loteXml);
         $tempo   = (int) ((microtime(true) - $inicio) * 1000);
 
-        $sucessoEnvio = in_array($retorno['http_code'], [200, 202]);
+        $sucessoEnvio = in_array($retorno['http_code'], [200, 201, 202]);
 
         return [
             'sucesso'                  => $sucessoEnvio,
@@ -60,10 +60,13 @@ class TransmissaoService
             'http_code'                => $retorno['http_code'],
             'xml_enviado'              => $loteXml,
             'xml_retorno'              => $retorno['body'],
-            'protocolo'                => $this->extrairTag($retorno['body'], 'nrProtEnvio'),
-            'codigo_retorno'           => $this->extrairTag($retorno['body'], 'cdRetorno')
+            'protocolo'                => $this->extrairTag($retorno['body'], 'protocoloEnvio')
+                                          ?: $this->extrairTag($retorno['body'], 'nrProtEnvio'),
+            'codigo_retorno'           => $this->extrairTag($retorno['body'], 'cdResposta')
+                                          ?: $this->extrairTag($retorno['body'], 'cdRetorno')
                                           ?: (string) $retorno['http_code'],
-            'desc_retorno'             => $this->extrairTag($retorno['body'], 'descRetorno')
+            'desc_retorno'             => $this->extrairTag($retorno['body'], 'descResposta')
+                                          ?: $this->extrairTag($retorno['body'], 'descRetorno')
                                           ?: ($sucessoEnvio ? 'Lote recebido — aguardando processamento' : $retorno['body']),
             'tempo_ms'                 => $tempo,
             'ambiente'                 => $this->tpAmb,
@@ -82,15 +85,24 @@ class TransmissaoService
         $retorno = $this->httpGet($url);
         $tempo   = (int) ((microtime(true) - $inicio) * 1000);
 
-        $sucesso = in_array($retorno['http_code'], [200, 202]);
+        $sucesso = in_array($retorno['http_code'], [200, 201, 202]);
+
+        $recibos = [];
+        if (preg_match_all('/<nrRecibo>([^<]+)<\/nrRecibo>/', $retorno['body'], $m)) {
+            $recibos = $m[1];
+        }
 
         return [
             'sucesso'        => $sucesso,
             'http_code'      => $retorno['http_code'],
             'xml_retorno'    => $retorno['body'],
-            'codigo_retorno' => $this->extrairTag($retorno['body'], 'cdRetorno')
+            'codigo_retorno' => $this->extrairTag($retorno['body'], 'cdResposta')
+                                ?: $this->extrairTag($retorno['body'], 'cdRetorno')
                                 ?: (string) $retorno['http_code'],
-            'desc_retorno'   => $this->extrairTag($retorno['body'], 'descRetorno') ?: $retorno['body'],
+            'desc_retorno'   => $this->extrairTag($retorno['body'], 'descResposta')
+                                ?: $this->extrairTag($retorno['body'], 'descRetorno')
+                                ?: $retorno['body'],
+            'recibos'        => $recibos,
             'tempo_ms'       => $tempo,
         ];
     }
