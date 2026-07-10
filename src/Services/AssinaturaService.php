@@ -162,7 +162,7 @@ class AssinaturaService
         }
 
         $nodeToSign = $nodes->item(0);
-        $refUri     = '#' . $nodeToSign->getAttribute('Id');
+        $refUri     = '#' . $nodeToSign->getAttribute('id');
 
         $canonical = $nodeToSign->C14N(false, false);
         $digestValue = base64_encode(hash('sha256', $canonical, true));
@@ -204,8 +204,9 @@ class AssinaturaService
 
         $sigFrag = $dom->createDocumentFragment();
         $sigFrag->appendXML($signatureXml);
-        $nodeToSign->appendChild($sigFrag);
+        // Assinatura vai como IRMÃO de <evtRetPJ>, filha de <Reinf>
+        $dom->documentElement->appendChild($sigFrag);
 
-        return $dom->saveXML();
+        return $dom->saveXML($dom);
     }
 }

@@ -2,10 +2,6 @@
 
 namespace App\Services;
 
-/**
- * Geração de XML EFD-Reinf conforme leiaute v2.1.2
- * Namespace: http://www.reinf.esocial.gov.br/schemas/{namespace}/v2_01_02
- */
 class GeracaoXmlService
 {
     private string $outputDir;
@@ -28,16 +24,22 @@ class GeracaoXmlService
         $this->procEmi = $config['reinf']['proc_emi'] ?? 1;
     }
 
-    // ─── Entrada pública ─────────────────────────────────────
-
     public function gerar(array $competencia, array $eventos, int $indRetif = 1, ?string $nrRecibo = null): array
     {
         $arquivos = [];
-
         $this->indRetif = $indRetif;
         $this->nrRecibo = $nrRecibo;
 
         foreach ($eventos as $evento) {
+            // R-4020 pode gerar múltiplos XMLs (um por beneficiário)
+            if ($evento === 'R4020') {
+                $xmls = $this->gerarR4020PorBeneficiario($competencia);
+                foreach ($xmls as $i => $xml) {
+                    $arquivos[] = $this->salvarXml($evento, $competencia, $xml, $indRetif, $i);
+                }
+                continue;
+            }
+
             $xml = match ($evento) {
                 'R1000' => $this->gerarR1000($competencia),
                 'R1070' => $this->gerarR1070($competencia),
@@ -46,42 +48,42 @@ class GeracaoXmlService
                 'R2060' => $this->gerarR2060($competencia),
                 'R2099' => $this->gerarR2099($competencia),
                 'R4010' => $this->gerarR4010($competencia),
-                'R4020' => $this->gerarR4020($competencia),
                 'R4099' => $this->gerarR4099($competencia),
                 'R9000' => $this->gerarR9000($competencia),
                 default => throw new \RuntimeException("Evento {$evento} não suportado."),
             };
 
-            $sufixoRetif = $indRetif === 2 ? '_RETIF' : '';
-            $nomeArq = sprintf(
-                'REINF_%s%s_%s_%s_%s.xml',
-                $evento, $sufixoRetif,
-                $competencia['cnpj'],
-                $competencia['periodo'],
-                date('YmdHis')
-            );
-            $caminho = $this->outputDir . $nomeArq;
-            file_put_contents($caminho, $xml);
-
-            $arquivos[] = [
-                'evento'  => $evento,
-                'nome'    => $nomeArq,
-                'caminho' => $caminho,
-                'tamanho' => filesize($caminho),
-                'hash'    => md5_file($caminho),
-                'xml'     => $xml,
-            ];
+            $arquivos[] = $this->salvarXml($evento, $competencia, $xml, $indRetif);
         }
 
         return $arquivos;
     }
 
-    // ─── Helpers ─────────────────────────────────────────────
+    private function salvarXml(string $evento, array $competencia, string $xml, int $indRetif, int $seq = 0): array
+    {
+        $sufixoRetif = $indRetif === 2 ? '_RETIF' : '';
+        $sufixoSeq   = $seq > 0 ? "_{$seq}" : '';
+        $nomeArq = sprintf('REINF_%s%s_%s_%s_%s%s.xml', $evento, $sufixoRetif, $competencia['cnpj'], $competencia['periodo'], date('YmdHis'), $sufixoSeq);
+        $caminho = $this->outputDir . $nomeArq;
+        file_put_contents($caminho, $xml);
+
+        return [
+            'evento'  => $evento,
+            'nome'    => $nomeArq,
+            'caminho' => $caminho,
+            'tamanho' => filesize($caminho),
+            'hash'    => md5_file($caminho),
+            'xml'     => $xml,
+        ];
+    }
 
     private function gerarId(string $cnpj): string
     {
-        return 'ID' . $cnpj . date('YmdHis') . str_pad(random_int(0, 99999), 5, '0', STR_PAD_LEFT);
+        // ID = 'ID' + [1-2] + 14 dígitos CNPJ + timestamp YYYYMMDDhhmmss + sequencial 5 dígitos
+        // Total: 2 + 1 + 14 + 14 + 5 = 36 chars (padrão XSD)
+        return 'ID1' . str_pad($cnpj, 14, '0', STR_PAD_LEFT) . date('YmdHis') . str_pad((string)random_int(0, 99999), 5, '0', STR_PAD_LEFT);
     }
+    
 
     private function ideEvento(string $perApur, int $indRetif = 1, ?string $nrRecibo = null): string
     {
@@ -101,10 +103,7 @@ class GeracaoXmlService
     private function ideContri(string $cnpj): string
     {
         $tp = strlen(preg_replace('/\D/', '', $cnpj)) <= 11 ? '2' : '1';
-        return "<ideContri>\n"
-             . "            <tpInsc>{$tp}</tpInsc>\n"
-             . "            <nrInsc>" . preg_replace('/\D/', '', $cnpj) . "</nrInsc>\n"
-             . "        </ideContri>";
+        return "<ideContri>\n            <tpInsc>{$tp}</tpInsc>\n            <nrInsc>" . preg_replace('/\D/', '', $cnpj) . "</nrInsc>\n        </ideContri>";
     }
 
     private function envelope(string $eventoTag, string $namespace, string $id, string $conteudo): string
@@ -119,25 +118,22 @@ class GeracaoXmlService
 
     private function fmtVal(float|string|null $valor): string
     {
-        return number_format((float) ($valor ?? 0), 2, '.', '');
+        return number_format((float) ($valor ?? 0), 2, ',', '');
     }
 
-    // ─── R-1000 · Informações do Contribuinte ────────────────
+    // ═══ R-1000 ═══════════════════════════════════════
 
     private function gerarR1000(array $comp): string
     {
-        $cnpj    = preg_replace('/\D/', '', $comp['cnpj']);
-        $periodo = $comp['periodo'];
+        $cnpj = preg_replace('/\D/', '', $comp['cnpj']);
+        $id   = $this->gerarId($cnpj);
         $classif = $comp['classificacao_tributos'] ?? '01';
-        $id      = $this->gerarId($cnpj);
 
-        $body = "        {$this->ideEvento($periodo)}\n"
+        $body = "        {$this->ideEvento($comp['periodo'])}\n"
               . "        {$this->ideContri($cnpj)}\n"
               . "        <infoContri>\n"
               . "            <inclusao>\n"
-              . "                <idePeriodo>\n"
-              . "                    <iniValid>{$periodo}</iniValid>\n"
-              . "                </idePeriodo>\n"
+              . "                <idePeriodo><iniValid>{$comp['periodo']}</iniValid></idePeriodo>\n"
               . "                <infoCadastro>\n"
               . "                    <classTrib>{$classif}</classTrib>\n"
               . "                    <indEscrituracao>0</indEscrituracao>\n"
@@ -146,7 +142,7 @@ class GeracaoXmlService
               . "                    <indSitPJ>0</indSitPJ>\n"
               . "                    <contato>\n"
               . "                        <nmCtt>" . htmlspecialchars($comp['razao_social'] ?? '') . "</nmCtt>\n"
-              . "                        <cpfCtt>" . preg_replace('/\D/', '', $comp['cnpj'] ?? '') . "</cpfCtt>\n"
+              . "                        <cpfCtt>" . substr($cnpj, 0, 11) . "</cpfCtt>\n"
               . "                    </contato>\n"
               . "                </infoCadastro>\n"
               . "            </inclusao>\n"
@@ -155,203 +151,110 @@ class GeracaoXmlService
         return $this->envelope('evtInfoContribuinte', 'evtInfoContribuinte', $id, $body);
     }
 
-    // ─── R-1070 · Tabela de Processos ────────────────────────
+    // ═══ R-1070 ═══════════════════════════════════════
 
     private function gerarR1070(array $comp): string
     {
         $cnpj = preg_replace('/\D/', '', $comp['cnpj']);
         $id   = $this->gerarId($cnpj);
 
-        $stmt = $this->db->prepare("SELECT * FROM r1070_processos WHERE contribuinte_id = ? AND status = 'ativo' ORDER BY data_inclusao");
+        $stmt = $this->db->prepare("SELECT * FROM r1070_processos WHERE contribuinte_id = ? AND status = 'ativo'");
         $stmt->execute([$comp['contribuinte_id']]);
         $processos = $stmt->fetchAll();
 
         if (empty($processos)) {
-            throw new \RuntimeException("Nenhum processo cadastrado para o contribuinte.");
+            throw new \RuntimeException("Nenhum processo cadastrado.");
         }
 
         $processosXml = '';
         foreach ($processos as $p) {
             $processosXml .= "            <inclusao>\n"
-                           . "                <idePeriodo>\n"
-                           . "                    <iniValid>{$comp['periodo']}</iniValid>\n"
-                           . "                </idePeriodo>\n"
-                           . "                <ideProcesso>\n"
-                           . "                    <tpProc>{$p['tipo_processo']}</tpProc>\n"
-                           . "                    <nrProc>" . htmlspecialchars($p['numero_processo']) . "</nrProc>\n";
-
-            if ($p['tipo_processo'] == 2) {
-                $processosXml .= "                    <indAutoria>" . ($p['indicador_autoria'] ?? 1) . "</indAutoria>\n";
-                if ($p['uf_vara']) {
-                    $processosXml .= "                    <ufVara>{$p['uf_vara']}</ufVara>\n";
-                }
-                if ($p['cod_municipio']) {
-                    $processosXml .= "                    <codMunic>{$p['cod_municipio']}</codMunic>\n";
-                }
-                if ($p['id_vara']) {
-                    $processosXml .= "                    <idVara>{$p['id_vara']}</idVara>\n";
-                }
-            }
-
-            $processosXml .= "                </ideProcesso>\n"
-                           . "                <infoSusp>\n"
-                           . "                    <indSusp>" . ($p['indicador_susp_exig'] ?? 0) . "</indSusp>\n";
-            if ($p['data_decisao']) {
-                $processosXml .= "                    <dtDecisao>{$p['data_decisao']}</dtDecisao>\n";
-            }
-            $processosXml .= "                    <indDeposito>" . ($p['indicador_deposito'] ?? 0) . "</indDeposito>\n"
-                           . "                </infoSusp>\n"
-                           . "            </inclusao>\n";
+                          . "                <idePeriodo><iniValid>{$comp['periodo']}</iniValid></idePeriodo>\n"
+                          . "                <ideProcesso>\n"
+                          . "                    <tpProc>{$p['tipo_processo']}</tpProc>\n"
+                          . "                    <nrProc>" . htmlspecialchars($p['numero_processo']) . "</nrProc>\n"
+                          . "                </ideProcesso>\n"
+                          . "                <infoSusp><indSusp>" . ($p['indicador_susp_exig'] ?? 0) . "</indSusp><indDeposito>" . ($p['indicador_deposito'] ?? 0) . "</indDeposito></infoSusp>\n"
+                          . "            </inclusao>\n";
         }
 
         $body = "        {$this->ideEvento($comp['periodo'], $this->indRetif, $this->nrRecibo)}\n"
               . "        {$this->ideContri($cnpj)}\n"
-              . "        <infoProcesso>\n"
-              . $processosXml
-              . "        </infoProcesso>";
+              . "        <infoProcesso>\n" . $processosXml . "        </infoProcesso>";
 
         return $this->envelope('evtTabProcesso', 'evtTabProcesso', $id, $body);
     }
 
-    // ─── R-2010 · Retenção INSS Serviços Tomados ─────────────
+    // ═══ R-2010 ═══════════════════════════════════════
 
     private function gerarR2010(array $comp): string
     {
         $cnpj = preg_replace('/\D/', '', $comp['cnpj']);
         $id   = $this->gerarId($cnpj);
 
-        $stmt = $this->db->prepare("SELECT * FROM r2010 WHERE competencia_id = ? ORDER BY cnpj_prestador, data_emissao");
+        $stmt = $this->db->prepare("SELECT * FROM r2010 WHERE competencia_id = ?");
         $stmt->execute([$comp['id']]);
         $registros = $stmt->fetchAll();
 
-        if (empty($registros)) {
-            throw new \RuntimeException("Nenhum registro R-2010 encontrado.");
-        }
+        if (empty($registros)) throw new \RuntimeException("Nenhum registro R-2010.");
 
-        $porPrestador = [];
+        $porPrest = [];
         foreach ($registros as $r) {
-            $cnpjPrest = preg_replace('/\D/', '', $r['cnpj_prestador']);
-            $porPrestador[$cnpjPrest][] = $r;
+            $porPrest[preg_replace('/\D/', '', $r['cnpj_prestador'])][] = $r;
         }
 
-        $prestadoresXml = '';
-        foreach ($porPrestador as $cnpjPrest => $nfs) {
-            $totalBruto  = array_sum(array_column($nfs, 'valor_bruto'));
-            $totalRet    = array_sum(array_column($nfs, 'valor_retencao'));
-
+        $xml = '';
+        foreach ($porPrest as $cnpjP => $nfs) {
+            $totBruto = array_sum(array_column($nfs, 'valor_bruto'));
+            $totRet   = array_sum(array_column($nfs, 'valor_retencao'));
             $nfsXml = '';
-            foreach ($nfs as $nf) {
-                $nfsXml .= "                    <nfs>\n"
-                         . "                        <serie>" . htmlspecialchars($nf['serie'] ?? '1') . "</serie>\n"
-                         . "                        <numDocto>" . htmlspecialchars($nf['num_documento'] ?: '1') . "</numDocto>\n"
-                         . "                        <dtEmissaoNF>" . ($nf['data_emissao'] ?: date('Y-m-d')) . "</dtEmissaoNF>\n"
-                         . "                        <vlrBruto>" . $this->fmtVal($nf['valor_bruto']) . "</vlrBruto>\n"
-                         . "                        <vlrBaseRet>" . $this->fmtVal($nf['valor_base_retencao'] ?? $nf['valor_bruto']) . "</vlrBaseRet>\n"
-                         . "                        <vlrRetencao>" . $this->fmtVal($nf['valor_retencao']) . "</vlrRetencao>\n"
-                         . "                        <vlrRetSub>0.00</vlrRetSub>\n"
-                         . "                        <vlrNRetPrinc>0.00</vlrNRetPrinc>\n"
-                         . "                        <vlrServicos15>" . $this->fmtVal($nf['valor_bruto']) . "</vlrServicos15>\n"
-                         . "                        <vlrServicos20>0.00</vlrServicos20>\n"
-                         . "                        <vlrServicos25>0.00</vlrServicos25>\n"
-                         . "                        <vlrAdicional>0.00</vlrAdicional>\n"
-                         . "                        <vlrNRetAdwordc>0.00</vlrNRetAdwordc>\n"
-                         . "                    </nfs>\n";
+            foreach ($nfs as $n) {
+                $nfsXml .= "                    <nfs><serie>" . ($n['serie'] ?? '1') . "</serie><numDocto>" . ($n['num_documento'] ?: '1') . "</numDocto><dtEmissaoNF>" . ($n['data_emissao'] ?: date('Y-m-d')) . "</dtEmissaoNF><vlrBruto>" . $this->fmtVal($n['valor_bruto']) . "</vlrBruto><vlrBaseRet>" . $this->fmtVal($n['valor_bruto']) . "</vlrBaseRet><vlrRetencao>" . $this->fmtVal($n['valor_retencao']) . "</vlrRetencao><vlrRetSub>0.00</vlrRetSub><vlrNRetPrinc>0.00</vlrNRetPrinc><vlrServicos15>" . $this->fmtVal($n['valor_bruto']) . "</vlrServicos15><vlrServicos20>0.00</vlrServicos20><vlrServicos25>0.00</vlrServicos25><vlrAdicional>0.00</vlrAdicional><vlrNRetAdwordc>0.00</vlrNRetAdwordc></nfs>\n";
             }
-
-            $prestadoresXml .= "                <idePrestServ>\n"
-                             . "                    <cnpjPrestador>{$cnpjPrest}</cnpjPrestador>\n"
-                             . "                    <vlrTotalBruto>" . $this->fmtVal($totalBruto) . "</vlrTotalBruto>\n"
-                             . "                    <vlrTotalBaseRet>" . $this->fmtVal($totalBruto) . "</vlrTotalBaseRet>\n"
-                             . "                    <vlrTotalRetPrinc>" . $this->fmtVal($totalRet) . "</vlrTotalRetPrinc>\n"
-                             . "                    <vlrTotalRetAdic>0.00</vlrTotalRetAdic>\n"
-                             . "                    <vlrTotalNRetPrinc>0.00</vlrTotalNRetPrinc>\n"
-                             . "                    <vlrTotalNRetAdic>0.00</vlrTotalNRetAdic>\n"
-                             . $nfsXml
-                             . "                </idePrestServ>\n";
+            $xml .= "                <idePrestServ><cnpjPrestador>{$cnpjP}</cnpjPrestador><vlrTotalBruto>" . $this->fmtVal($totBruto) . "</vlrTotalBruto><vlrTotalBaseRet>" . $this->fmtVal($totBruto) . "</vlrTotalBaseRet><vlrTotalRetPrinc>" . $this->fmtVal($totRet) . "</vlrTotalRetPrinc><vlrTotalRetAdic>0.00</vlrTotalRetAdic><vlrTotalNRetPrinc>0.00</vlrTotalNRetPrinc><vlrTotalNRetAdic>0.00</vlrTotalNRetAdic>\n{$nfsXml}                </idePrestServ>\n";
         }
 
         $body = "        {$this->ideEvento($comp['periodo'], $this->indRetif, $this->nrRecibo)}\n"
               . "        {$this->ideContri($cnpj)}\n"
-              . "        <ideEstabObra>\n"
-              . "            <tpInscEstab>1</tpInscEstab>\n"
-              . "            <nrInscEstab>{$cnpj}</nrInscEstab>\n"
-              . "            <indObra>0</indObra>\n"
-              . $prestadoresXml
-              . "        </ideEstabObra>";
+              . "        <ideEstabObra><tpInscEstab>1</tpInscEstab><nrInscEstab>{$cnpj}</nrInscEstab><indObra>0</indObra>\n{$xml}        </ideEstabObra>";
 
         return $this->envelope('evtServTom', 'evtTomadorServicos', $id, $body);
     }
 
-    // ─── R-2020 · Retenção INSS Serviços Prestados ───────────
+    // ═══ R-2020 ═══════════════════════════════════════
 
     private function gerarR2020(array $comp): string
     {
         $cnpj = preg_replace('/\D/', '', $comp['cnpj']);
         $id   = $this->gerarId($cnpj);
 
-        $stmt = $this->db->prepare("SELECT * FROM r2020 WHERE competencia_id = ? ORDER BY cnpj_tomador");
+        $stmt = $this->db->prepare("SELECT * FROM r2020 WHERE competencia_id = ?");
         $stmt->execute([$comp['id']]);
         $registros = $stmt->fetchAll();
+        if (empty($registros)) throw new \RuntimeException("Nenhum registro R-2020.");
 
-        if (empty($registros)) {
-            throw new \RuntimeException("Nenhum registro R-2020 encontrado.");
-        }
+        $porTom = [];
+        foreach ($registros as $r) $porTom[preg_replace('/\D/', '', $r['cnpj_tomador'])][] = $r;
 
-        $porTomador = [];
-        foreach ($registros as $r) {
-            $cnpjTom = preg_replace('/\D/', '', $r['cnpj_tomador']);
-            $porTomador[$cnpjTom][] = $r;
-        }
-
-        $tomadoresXml = '';
-        foreach ($porTomador as $cnpjTom => $nfs) {
-            $totalBruto = array_sum(array_column($nfs, 'valor_bruto'));
-            $totalRet   = array_sum(array_column($nfs, 'valor_retencao'));
-
+        $xml = '';
+        foreach ($porTom as $cnpjT => $nfs) {
+            $totBruto = array_sum(array_column($nfs, 'valor_bruto'));
+            $totRet   = array_sum(array_column($nfs, 'valor_retencao'));
             $nfsXml = '';
-            foreach ($nfs as $nf) {
-                $nfsXml .= "                    <nfs>\n"
-                         . "                        <serie>" . htmlspecialchars($nf['serie'] ?? '1') . "</serie>\n"
-                         . "                        <numDocto>" . htmlspecialchars($nf['num_documento'] ?: '1') . "</numDocto>\n"
-                         . "                        <dtEmissaoNF>" . ($nf['data_emissao'] ?: date('Y-m-d')) . "</dtEmissaoNF>\n"
-                         . "                        <vlrBruto>" . $this->fmtVal($nf['valor_bruto']) . "</vlrBruto>\n"
-                         . "                        <vlrBaseRet>" . $this->fmtVal($nf['valor_base_retencao'] ?? $nf['valor_bruto']) . "</vlrBaseRet>\n"
-                         . "                        <vlrRetencao>" . $this->fmtVal($nf['valor_retencao']) . "</vlrRetencao>\n"
-                         . "                        <vlrRetSub>0.00</vlrRetSub>\n"
-                         . "                        <vlrNRetPrinc>0.00</vlrNRetPrinc>\n"
-                         . "                        <vlrServicos15>" . $this->fmtVal($nf['valor_bruto']) . "</vlrServicos15>\n"
-                         . "                        <vlrServicos20>0.00</vlrServicos20>\n"
-                         . "                        <vlrServicos25>0.00</vlrServicos25>\n"
-                         . "                        <vlrAdicional>0.00</vlrAdicional>\n"
-                         . "                        <vlrNRetAdwordc>0.00</vlrNRetAdwordc>\n"
-                         . "                    </nfs>\n";
+            foreach ($nfs as $n) {
+                $nfsXml .= "                    <nfs><serie>" . ($n['serie'] ?? '1') . "</serie><numDocto>" . ($n['num_documento'] ?: '1') . "</numDocto><dtEmissaoNF>" . ($n['data_emissao'] ?: date('Y-m-d')) . "</dtEmissaoNF><vlrBruto>" . $this->fmtVal($n['valor_bruto']) . "</vlrBruto><vlrBaseRet>" . $this->fmtVal($n['valor_bruto']) . "</vlrBaseRet><vlrRetencao>" . $this->fmtVal($n['valor_retencao']) . "</vlrRetencao><vlrRetSub>0.00</vlrRetSub><vlrNRetPrinc>0.00</vlrNRetPrinc><vlrServicos15>" . $this->fmtVal($n['valor_bruto']) . "</vlrServicos15><vlrServicos20>0.00</vlrServicos20><vlrServicos25>0.00</vlrServicos25><vlrAdicional>0.00</vlrAdicional><vlrNRetAdwordc>0.00</vlrNRetAdwordc></nfs>\n";
             }
-
-            $tomadoresXml .= "                <ideTomador>\n"
-                           . "                    <tpInscTomador>" . ($nfs[0]['tipo_insc_tomador'] ?? '1') . "</tpInscTomador>\n"
-                           . "                    <nrInscTomador>{$cnpjTom}</nrInscTomador>\n"
-                           . "                    <vlrTotalBruto>" . $this->fmtVal($totalBruto) . "</vlrTotalBruto>\n"
-                           . "                    <vlrTotalBaseRet>" . $this->fmtVal($totalBruto) . "</vlrTotalBaseRet>\n"
-                           . "                    <vlrTotalRetPrinc>" . $this->fmtVal($totalRet) . "</vlrTotalRetPrinc>\n"
-                           . "                    <vlrTotalRetAdic>0.00</vlrTotalRetAdic>\n"
-                           . "                    <vlrTotalNRetPrinc>0.00</vlrTotalNRetPrinc>\n"
-                           . "                    <vlrTotalNRetAdic>0.00</vlrTotalNRetAdic>\n"
-                           . $nfsXml
-                           . "                </ideTomador>\n";
+            $xml .= "                <ideTomador><tpInscTomador>1</tpInscTomador><nrInscTomador>{$cnpjT}</nrInscTomador><vlrTotalBruto>" . $this->fmtVal($totBruto) . "</vlrTotalBruto><vlrTotalBaseRet>" . $this->fmtVal($totBruto) . "</vlrTotalBaseRet><vlrTotalRetPrinc>" . $this->fmtVal($totRet) . "</vlrTotalRetPrinc><vlrTotalRetAdic>0.00</vlrTotalRetAdic><vlrTotalNRetPrinc>0.00</vlrTotalNRetPrinc><vlrTotalNRetAdic>0.00</vlrTotalNRetAdic>\n{$nfsXml}                </ideTomador>\n";
         }
 
         $body = "        {$this->ideEvento($comp['periodo'], $this->indRetif, $this->nrRecibo)}\n"
               . "        {$this->ideContri($cnpj)}\n"
-              . "        <ideEstabPrest>\n"
-              . "            <tpInscEstabPrest>1</tpInscEstabPrest>\n"
-              . "            <nrInscEstabPrest>{$cnpj}</nrInscEstabPrest>\n"
-              . $tomadoresXml
-              . "        </ideEstabPrest>";
+              . "        <ideEstabPrest><tpInscEstabPrest>1</tpInscEstabPrest><nrInscEstabPrest>{$cnpj}</nrInscEstabPrest>\n{$xml}        </ideEstabPrest>";
 
         return $this->envelope('evtServPrest', 'evtServicosPrestados', $id, $body);
     }
 
-    // ─── R-2060 · CPRB ───────────────────────────────────────
+    // ═══ R-2060 ═══════════════════════════════════════
 
     private function gerarR2060(array $comp): string
     {
@@ -361,38 +264,23 @@ class GeracaoXmlService
         $stmt = $this->db->prepare("SELECT * FROM r2060 WHERE competencia_id = ?");
         $stmt->execute([$comp['id']]);
         $registros = $stmt->fetchAll();
+        if (empty($registros)) throw new \RuntimeException("Nenhum registro R-2060.");
 
-        if (empty($registros)) {
-            throw new \RuntimeException("Nenhum registro R-2060 encontrado.");
-        }
-
-        $atividadesXml = '';
+        $xml = '';
         foreach ($registros as $r) {
-            $bc = (float) ($r['valor_rec_bruta'] ?? 0) - (float) ($r['valor_exclusoes'] ?? 0);
-            $vlrCprb = $bc * ((float) ($r['aliquota'] ?? 0) / 100);
-
-            $atividadesXml .= "                <tipoCod>\n"
-                            . "                    <codAtivEcon>" . htmlspecialchars($r['cnae']) . "</codAtivEcon>\n"
-                            . "                    <vlrRecBrutaAtiv>" . $this->fmtVal($r['valor_rec_bruta']) . "</vlrRecBrutaAtiv>\n"
-                            . "                    <vlrExcRecBruta>" . $this->fmtVal($r['valor_exclusoes']) . "</vlrExcRecBruta>\n"
-                            . "                    <vlrAdicRecBruta>0.00</vlrAdicRecBruta>\n"
-                            . "                    <vlrBcCPRB>" . $this->fmtVal($bc) . "</vlrBcCPRB>\n"
-                            . "                    <vlrCPRBapur>" . $this->fmtVal($vlrCprb) . "</vlrCPRBapur>\n"
-                            . "                </tipoCod>\n";
+            $bc = (float)$r['valor_rec_bruta'] - (float)$r['valor_exclusoes'];
+            $cprb = $bc * ((float)$r['aliquota'] / 100);
+            $xml .= "                <tipoCod><codAtivEcon>" . htmlspecialchars($r['cnae']) . "</codAtivEcon><vlrRecBrutaAtiv>" . $this->fmtVal($r['valor_rec_bruta']) . "</vlrRecBrutaAtiv><vlrExcRecBruta>" . $this->fmtVal($r['valor_exclusoes']) . "</vlrExcRecBruta><vlrAdicRecBruta>0.00</vlrAdicRecBruta><vlrBcCPRB>" . $this->fmtVal($bc) . "</vlrBcCPRB><vlrCPRBapur>" . $this->fmtVal($cprb) . "</vlrCPRBapur></tipoCod>\n";
         }
 
         $body = "        {$this->ideEvento($comp['periodo'], $this->indRetif, $this->nrRecibo)}\n"
               . "        {$this->ideContri($cnpj)}\n"
-              . "        <ideEstab>\n"
-              . "            <tpInscEstab>1</tpInscEstab>\n"
-              . "            <nrInscEstab>{$cnpj}</nrInscEstab>\n"
-              . $atividadesXml
-              . "        </ideEstab>";
+              . "        <ideEstab><tpInscEstab>1</tpInscEstab><nrInscEstab>{$cnpj}</nrInscEstab>\n{$xml}        </ideEstab>";
 
         return $this->envelope('evtCPRB', 'evtCPRB', $id, $body);
     }
 
-    // ─── R-2099 · Fechamento série R-2000 ────────────────────
+    // ═══ R-2099 ═══════════════════════════════════════
 
     private function gerarR2099(array $comp): string
     {
@@ -401,194 +289,144 @@ class GeracaoXmlService
 
         $body = "        {$this->ideEvento($comp['periodo'], $this->indRetif, $this->nrRecibo)}\n"
               . "        {$this->ideContri($cnpj)}\n"
-              . "        <ideRespInf>\n"
-              . "            <nmResp>" . htmlspecialchars($comp['razao_social'] ?? '') . "</nmResp>\n"
-              . "            <cpfResp>" . substr($cnpj, 0, 11) . "</cpfResp>\n"
-              . "            <telefone></telefone>\n"
-              . "            <email></email>\n"
-              . "        </ideRespInf>\n"
-              . "        <infoFech>\n"
-              . "            <evtServTm>S</evtServTm>\n"
-              . "            <evtServPr>S</evtServPr>\n"
-              . "            <evtAssDespRec>N</evtAssDespRec>\n"
-              . "            <evtAssDespRep>N</evtAssDespRep>\n"
-              . "            <evtComProd>N</evtComProd>\n"
-              . "            <evtCPRB>N</evtCPRB>\n"
-              . "            <evtAquis>N</evtAquis>\n"
-              . "        </infoFech>";
+              . "        <ideRespInf><nmResp>" . htmlspecialchars($comp['razao_social'] ?? '') . "</nmResp><cpfResp>" . substr($cnpj, 0, 11) . "</cpfResp><telefone></telefone><email></email></ideRespInf>\n"
+              . "        <infoFech><evtServTm>S</evtServTm><evtServPr>S</evtServPr><evtAssDespRec>N</evtAssDespRec><evtAssDespRep>N</evtAssDespRep><evtComProd>N</evtComProd><evtCPRB>N</evtCPRB><evtAquis>N</evtAquis></infoFech>";
 
         return $this->envelope('evtFechaEvPer', 'evtFechaEvPer', $id, $body);
     }
 
-    // ─── R-4010 · Pagamentos PF (IRRF) ──────────────────────
+    // ═══ R-4010 ═══════════════════════════════════════
 
     private function gerarR4010(array $comp): string
     {
         $cnpj = preg_replace('/\D/', '', $comp['cnpj']);
         $id   = $this->gerarId($cnpj);
 
-        $stmt = $this->db->prepare("SELECT * FROM r4010 WHERE competencia_id = ? ORDER BY cpf_beneficiario, data_pagamento");
+        $stmt = $this->db->prepare("SELECT * FROM r4010 WHERE competencia_id = ?");
         $stmt->execute([$comp['id']]);
         $registros = $stmt->fetchAll();
+        if (empty($registros)) throw new \RuntimeException("Nenhum registro R-4010.");
 
-        if (empty($registros)) {
-            throw new \RuntimeException("Nenhum registro R-4010 encontrado.");
-        }
+        $porB = [];
+        foreach ($registros as $r) $porB[preg_replace('/\D/', '', $r['cpf_beneficiario'])][] = $r;
 
-        $porBenef = [];
-        foreach ($registros as $r) {
-            $cpf = preg_replace('/\D/', '', $r['cpf_beneficiario']);
-            $porBenef[$cpf][] = $r;
-        }
-
-        $benefXml = '';
-        foreach ($porBenef as $cpf => $pagtos) {
-            $pgtoXml = '';
+        $xml = '';
+        foreach ($porB as $cpf => $pagtos) {
+            $pgto = '';
             foreach ($pagtos as $p) {
-                $pgtoXml .= "                    <infoPgto>\n"
-                          . "                        <dtFG>" . $p['data_pagamento'] . "</dtFG>\n"
-                          . "                        <vlrRendBruto>" . $this->fmtVal($p['valor_bruto']) . "</vlrRendBruto>\n"
-                          . "                        <vlrRendTrib>" . $this->fmtVal($p['valor_base_ir'] ?? $p['valor_bruto']) . "</vlrRendTrib>\n"
-                          . "                        <vlrIR>" . $this->fmtVal($p['valor_ir']) . "</vlrIR>\n";
-                if ((float) ($p['valor_deducao'] ?? 0) > 0) {
-                    $pgtoXml .= "                        <detDed>\n"
-                              . "                            <indTpDeducao>1</indTpDeducao>\n"
-                              . "                            <vlrDeducao>" . $this->fmtVal($p['valor_deducao']) . "</vlrDeducao>\n"
-                              . "                        </detDed>\n";
-                }
-                $pgtoXml .= "                    </infoPgto>\n";
+                $pgto .= "                    <infoPgto><dtFG>{$p['data_pagamento']}</dtFG><vlrRendBruto>" . $this->fmtVal($p['valor_bruto']) . "</vlrRendBruto><vlrRendTrib>" . $this->fmtVal($p['valor_base_ir'] ?? $p['valor_bruto']) . "</vlrRendTrib><vlrIR>" . $this->fmtVal($p['valor_ir']) . "</vlrIR></infoPgto>\n";
             }
-
-            $benefXml .= "                <ideBenef>\n"
-                       . "                    <cpfBenef>{$cpf}</cpfBenef>\n"
-                       . "                    <nmBenef>" . htmlspecialchars($pagtos[0]['nome_beneficiario'] ?? '') . "</nmBenef>\n"
-                       . "                    <ideEvtAdic>\n"
-                       . "                        <tpIsencao>0</tpIsencao>\n"
-                       . "                        <natRend>" . ($pagtos[0]['natureza_rendimento'] ?? '10001') . "</natRend>\n"
-                       . "                    </ideEvtAdic>\n"
-                       . $pgtoXml
-                       . "                </ideBenef>\n";
+            $xml .= "                <ideBenef><cpfBenef>{$cpf}</cpfBenef><nmBenef>" . htmlspecialchars($pagtos[0]['nome_beneficiario'] ?? '') . "</nmBenef><ideEvtAdic><tpIsencao>0</tpIsencao><natRend>" . ($pagtos[0]['natureza_rendimento'] ?? '10001') . "</natRend></ideEvtAdic>\n{$pgto}                </ideBenef>\n";
         }
 
         $body = "        {$this->ideEvento($comp['periodo'], $this->indRetif, $this->nrRecibo)}\n"
               . "        {$this->ideContri($cnpj)}\n"
-              . "        <ideEstab>\n"
-              . "            <tpInscEstab>1</tpInscEstab>\n"
-              . "            <nrInscEstab>{$cnpj}</nrInscEstab>\n"
-              . $benefXml
-              . "        </ideEstab>";
+              . "        <ideEstab><tpInscEstab>1</tpInscEstab><nrInscEstab>{$cnpj}</nrInscEstab>\n{$xml}        </ideEstab>";
 
         return $this->envelope('evtRetPF', 'evt4010PagtoBeneficiarioPF', $id, $body);
     }
 
-    // ─── R-4020 · Pagamentos PJ (IRRF/CSLL/COFINS/PIS) ──────
-
-   // ─── R-4020 · Pagamentos PJ (IRRF/CSLL/COFINS/PIS) ──────
-
-    private function gerarR4020(array $comp): string
+    // ═══ R-4020 · Pagamentos PJ (estrutura oficial) ═══
+      private function gerarR4020(array $comp): string
     {
-        $cnpj = preg_replace('/\D/', '', $comp['cnpj']);
-        $id   = $this->gerarId($cnpj);
-
-        $stmt = $this->db->prepare("
-            SELECT * FROM r4020
-            WHERE competencia_id = ?
-            ORDER BY cnpj_beneficiario, natureza_rendimento, data_pagamento
-        ");
-        $stmt->execute([$comp['id']]);
-        $registros = $stmt->fetchAll();
-
-        if (empty($registros)) {
+        // Este método agora só gera o XML de UM beneficiário — o primeiro.
+        // Para múltiplos, use gerarR4020PorBeneficiario() no controller.
+        $arquivos = $this->gerarR4020PorBeneficiario($comp);
+        if (empty($arquivos)) {
             throw new \RuntimeException("Nenhum registro R-4020 encontrado.");
         }
+        return $arquivos[0];
+    }
 
-        // Agrupa por CNPJ beneficiário (cada beneficiário terá seus idePgto por natureza)
+    public function gerarR4020PorBeneficiario(array $comp): array
+    {
+        $cnpj = preg_replace('/\D/', '', $comp['cnpj']);
+
+        $stmt = $this->db->prepare("SELECT * FROM r4020 WHERE competencia_id = ? ORDER BY cnpj_beneficiario, natureza_rendimento, data_pagamento");
+        $stmt->execute([$comp['id']]);
+        $registros = $stmt->fetchAll();
+        if (empty($registros)) return [];
+
+        // Agrupa por CNPJ beneficiário
         $porBenef = [];
         foreach ($registros as $r) {
-            $cnpjBenef = preg_replace('/\D/', '', $r['cnpj_beneficiario']);
-            $porBenef[$cnpjBenef][] = $r;
+            $porBenef[preg_replace('/\D/', '', $r['cnpj_beneficiario'])][] = $r;
         }
 
-        $benefXml = '';
+        $xmls = [];
         foreach ($porBenef as $cnpjBenef => $pagtosBenef) {
             $nome = $pagtosBenef[0]['razao_social_beneficiario'] ?? '';
+            $id = $this->gerarId($cnpj);
 
-            // Dentro do beneficiário, agrupa por natureza
-            $porNatureza = [];
+            // Agrupa por natureza dentro deste beneficiário
+            $porNat = [];
             foreach ($pagtosBenef as $p) {
                 $nat = $p['cod_tipo_servico'] ?? $p['natureza_rendimento'] ?? '00000';
-                $porNatureza[$nat][] = $p;
+                $porNat[$nat][] = $p;
             }
 
             $idePgtoXml = '';
-            foreach ($porNatureza as $natRend => $pagtos) {
+            foreach ($porNat as $natRend => $pagtos) {
                 $infoPgtoXml = '';
                 foreach ($pagtos as $p) {
-                    $vBruto  = (float) ($p['valor_bruto'] ?? 0);
-                    $vBaseIR = (float) ($p['valor_base_ir'] ?? $vBruto);
-                    $vIR     = (float) ($p['valor_ir'] ?? 0);
-                    $vCSLL   = (float) ($p['valor_csll'] ?? 0);
-                    $vCofins = (float) ($p['valor_cofins'] ?? 0);
-                    $vPIS    = (float) ($p['valor_pis'] ?? 0);
+                    $vBruto  = (float)($p['valor_bruto'] ?? 0);
+                    $vBaseIR = (float)($p['valor_base_ir'] ?? $vBruto);
+                    $vIR     = (float)($p['valor_ir'] ?? 0);
+                    $vCSLL   = (float)($p['valor_csll'] ?? 0);
+                    $vCofins = (float)($p['valor_cofins'] ?? 0);
+                    $vPIS    = (float)($p['valor_pis'] ?? 0);
                     $indJud  = !empty($p['indicador_judicial']) ? 'S' : 'N';
 
-                    $infoPgtoXml .= "                        <infoPgto>\n"
-                                  . "                            <dtFG>" . $p['data_pagamento'] . "</dtFG>\n"
-                                  . "                            <vlrBruto>" . $this->fmtVal($vBruto) . "</vlrBruto>\n"
-                                  . "                            <indJud>{$indJud}</indJud>\n";
+                    $infoPgtoXml .= "<infoPgto>"
+                                  . "<dtFG>{$p['data_pagamento']}</dtFG>"
+                                  . "<vlrBruto>" . $this->fmtVal($vBruto) . "</vlrBruto>"
+                                  . "<indJud>{$indJud}</indJud>";
 
-                    // Bloco de retenções
-                    $temRetencao = ($vIR > 0 || $vCSLL > 0 || $vCofins > 0 || $vPIS > 0);
-                    if ($temRetencao) {
-                        $infoPgtoXml .= "                            <retencoes>\n"
-                                      . "                                <vlrBaseIR>" . $this->fmtVal($vBaseIR) . "</vlrBaseIR>\n"
-                                      . "                                <vlrIR>" . $this->fmtVal($vIR) . "</vlrIR>\n";
+                    if ($vIR > 0 || $vCSLL > 0 || $vCofins > 0 || $vPIS > 0) {
+                        $infoPgtoXml .= "<retencoes>"
+                                      . "<vlrBaseIR>" . $this->fmtVal($vBaseIR) . "</vlrBaseIR>"
+                                      . "<vlrIR>" . $this->fmtVal($vIR) . "</vlrIR>";
                         if ($vCSLL > 0) {
-                            $infoPgtoXml .= "                                <vlrBaseCSLL>" . $this->fmtVal($vBruto) . "</vlrBaseCSLL>\n"
-                                          . "                                <vlrCSLL>" . $this->fmtVal($vCSLL) . "</vlrCSLL>\n";
+                            $infoPgtoXml .= "<vlrBaseCSLL>" . $this->fmtVal($vBruto) . "</vlrBaseCSLL>"
+                                          . "<vlrCSLL>" . $this->fmtVal($vCSLL) . "</vlrCSLL>";
                         }
                         if ($vCofins > 0) {
-                            $infoPgtoXml .= "                                <vlrBaseCofins>" . $this->fmtVal($vBruto) . "</vlrBaseCofins>\n"
-                                          . "                                <vlrCofins>" . $this->fmtVal($vCofins) . "</vlrCofins>\n";
+                            $infoPgtoXml .= "<vlrBaseCofins>" . $this->fmtVal($vBruto) . "</vlrBaseCofins>"
+                                          . "<vlrCofins>" . $this->fmtVal($vCofins) . "</vlrCofins>";
                         }
                         if ($vPIS > 0) {
-                            $infoPgtoXml .= "                                <vlrBasePP>" . $this->fmtVal($vBruto) . "</vlrBasePP>\n"
-                                          . "                                <vlrPP>" . $this->fmtVal($vPIS) . "</vlrPP>\n";
+                            $infoPgtoXml .= "<vlrBasePP>" . $this->fmtVal($vBruto) . "</vlrBasePP>"
+                                          . "<vlrPP>" . $this->fmtVal($vPIS) . "</vlrPP>";
                         }
-                        $infoPgtoXml .= "                            </retencoes>\n";
+                        $infoPgtoXml .= "</retencoes>";
                     }
 
-                    $infoPgtoXml .= "                        </infoPgto>\n";
+                    $infoPgtoXml .= "</infoPgto>";
                 }
 
-                $idePgtoXml .= "                    <idePgto>\n"
-                             . "                        <natRend>{$natRend}</natRend>\n"
-                             . $infoPgtoXml
-                             . "                    </idePgto>\n";
+                $idePgtoXml .= "<idePgto><natRend>{$natRend}</natRend>{$infoPgtoXml}</idePgto>";
             }
 
-            $benefXml .= "                <ideBenef>\n"
-                       . "                    <cnpjBenef>{$cnpjBenef}</cnpjBenef>\n"
-                       . "                    <nmBenef>" . htmlspecialchars($nome) . "</nmBenef>\n"
-                       . $idePgtoXml
-                       . "                </ideBenef>\n";
+            $benefXml = "<ideBenef>"
+                      . "<cnpjBenef>{$cnpjBenef}</cnpjBenef>"
+                      . "<nmBenef>" . htmlspecialchars($nome) . "</nmBenef>"
+                      . $idePgtoXml
+                      . "</ideBenef>";
+
+            $cnpjEstab = preg_replace('/\D/', '', $registros[0]['cnpj_contribuinte'] ?? $cnpj) ?: $cnpj;
+
+            $body = "        {$this->ideEvento($comp['periodo'], $this->indRetif, $this->nrRecibo)}\n"
+                  . "        {$this->ideContri($cnpj)}\n"
+                  . "        <ideEstab><tpInscEstab>1</tpInscEstab><nrInscEstab>{$cnpjEstab}</nrInscEstab>{$benefXml}</ideEstab>";
+
+            $xmls[] = $this->envelope('evtRetPJ', 'evt4020PagtoBeneficiarioPJ', $id, $body);
+            usleep(1000); // garantir IDs únicos
         }
 
-        $cnpjEstab = $registros[0]['cnpj_contribuinte'] ?? $cnpj;
-        $cnpjEstab = preg_replace('/\D/', '', $cnpjEstab) ?: $cnpj;
-
-        $body = "        {$this->ideEvento($comp['periodo'], $this->indRetif, $this->nrRecibo)}\n"
-              . "        {$this->ideContri($cnpj)}\n"
-              . "        <ideEstab>\n"
-              . "            <tpInscEstab>1</tpInscEstab>\n"
-              . "            <nrInscEstab>{$cnpjEstab}</nrInscEstab>\n"
-              . $benefXml
-              . "        </ideEstab>";
-
-        return $this->envelope('evtRetPJ', 'evt4020PagtoBeneficiarioPJ', $id, $body);
+        return $xmls;
     }
-
-    // ─── R-4099 · Fechamento série R-4000 ────────────────────
+   
+    // ═══ R-4099 ═══════════════════════════════════════
 
     private function gerarR4099(array $comp): string
     {
@@ -597,44 +435,26 @@ class GeracaoXmlService
 
         $body = "        {$this->ideEvento($comp['periodo'], $this->indRetif, $this->nrRecibo)}\n"
               . "        {$this->ideContri($cnpj)}\n"
-              . "        <ideRespInf>\n"
-              . "            <nmResp>" . htmlspecialchars($comp['razao_social'] ?? '') . "</nmResp>\n"
-              . "            <cpfResp>" . substr($cnpj, 0, 11) . "</cpfResp>\n"
-              . "            <telefone></telefone>\n"
-              . "            <email></email>\n"
-              . "        </ideRespInf>\n"
-              . "        <infoFech>\n"
-              . "            <fechRet>S</fechRet>\n"
-              . "        </infoFech>";
+              . "        <ideRespInf><nmResp>" . htmlspecialchars($comp['razao_social'] ?? '') . "</nmResp><cpfResp>" . substr($cnpj, 0, 11) . "</cpfResp><telefone></telefone><email></email></ideRespInf>\n"
+              . "        <infoFech><fechRet>S</fechRet></infoFech>";
 
         return $this->envelope('evtFechaRetPgtos', 'evtFechaRetPgtos', $id, $body);
     }
 
-    // ─── R-9000 · Exclusão de evento ─────────────────────────
+    // ═══ R-9000 ═══════════════════════════════════════
 
     private function gerarR9000(array $comp): string
     {
         $cnpj = preg_replace('/\D/', '', $comp['cnpj']);
         $id   = $this->gerarId($cnpj);
-
         $nrRecibo = $comp['num_recibo'] ?? '';
         $tpEvt    = $comp['tipo_evento_exclusao'] ?? 'R-2010';
 
-        if (empty($nrRecibo)) {
-            throw new \RuntimeException("R-9000 exige número do recibo do evento a excluir.");
-        }
+        if (empty($nrRecibo)) throw new \RuntimeException("R-9000 exige número do recibo.");
 
-        $body = "        <ideEvento>\n"
-              . "            <tpAmb>{$this->tpAmb}</tpAmb>\n"
-              . "            <procEmi>{$this->procEmi}</procEmi>\n"
-              . "            <verProc>{$this->verProc}</verProc>\n"
-              . "        </ideEvento>\n"
+        $body = "        <ideEvento><tpAmb>{$this->tpAmb}</tpAmb><procEmi>{$this->procEmi}</procEmi><verProc>{$this->verProc}</verProc></ideEvento>\n"
               . "        {$this->ideContri($cnpj)}\n"
-              . "        <infoExclusao>\n"
-              . "            <tpEvento>{$tpEvt}</tpEvento>\n"
-              . "            <nrRecEvt>{$nrRecibo}</nrRecEvt>\n"
-              . "            <perApur>{$comp['periodo']}</perApur>\n"
-              . "        </infoExclusao>";
+              . "        <infoExclusao><tpEvento>{$tpEvt}</tpEvento><nrRecEvt>{$nrRecibo}</nrRecEvt><perApur>{$comp['periodo']}</perApur></infoExclusao>";
 
         return $this->envelope('evtExclusao', 'evtExclusao', $id, $body);
     }
