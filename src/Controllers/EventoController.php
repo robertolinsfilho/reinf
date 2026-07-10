@@ -306,11 +306,15 @@ class EventoController extends BaseController
             $naturezas[$r['grupo']][] = ['codigo' => $r['codigo'], 'descricao' => $r['descricao']];
         }
 
+        $editId  = (int) $this->get('id');
+        $editando = $editId ? $this->eventos->find('r4020', $editId, $cid) : null;
+
         $this->view('pages/eventos/r4020', [
             'pageTitle'   => 'R-4020 – Pagamentos/Créditos PJ',
             'competencia' => $this->getComp($cid),
             'registros'   => $this->eventos->listar('r4020', $cid, 'data_pagamento DESC', $p['limit'], $p['offset']),
             'naturezas'   => $naturezas,
+            'editando'    => $editando,
             'total'       => $p['total'],
             'page'        => $p['page'],
             'totalPages'  => $p['totalPages'],
@@ -325,32 +329,42 @@ class EventoController extends BaseController
         $this->getComp($cid);
 
         $this->safeExecute(function () use ($cid) {
+            $id             = (int) $this->post('id', 0);
             $codTipoServico = str_pad($this->post('cod_tipo_servico', ''), 5, '0', STR_PAD_LEFT);
 
-            $this->eventos->inserir('r4020', [
-                'competencia_id'          => $cid,
-                'cnpj_contribuinte'       => $this->postCnpj('cnpj_contribuinte') ?: null,
-                'cnpj_beneficiario'       => $this->postCnpj('cnpj_beneficiario'),
-                'num_nfs'                 => $this->sanitize($this->post('num_nfs', '')),
-                'periodo_apuracao'        => $this->post('periodo_apuracao') ?: null,
-                'razao_social_beneficiario' => $this->sanitize($this->post('razao_social_beneficiario', '')),
-                'natureza_rendimento'     => $codTipoServico,
-                'cod_tipo_servico'        => $codTipoServico,
-                'cod_pais'                => $this->post('cod_pais') ?: null,
-                'data_pagamento'          => $this->post('data_pagamento', date('Y-m-d')),
-                'valor_bruto'             => $this->postMoney('valor_bruto'),
-                'valor_base_ir'           => $this->postMoney('valor_base_ir'),
-                'valor_ir'                => $this->postMoney('valor_ir'),
-                'vl_csrf_agregado'        => $this->postMoney('vl_csrf_agregado'),
-                'valor_csll'              => $this->postMoney('valor_csll'),
-                'valor_pis'               => $this->postMoney('valor_pis'),
-                'valor_cofins'            => $this->postMoney('valor_cofins'),
-                'identificador_adicional' => $this->sanitize($this->post('identificador_adicional', '')),
-                'indicador_judicial'      => !empty($this->post('indicador_judicial')) ? 1 : 0,
-                'numero_processo'         => $this->sanitize($this->post('numero_processo', '')),
-                'observacoes'             => $this->sanitize($this->post('observacoes', '')),
-            ]);
-            $this->redirect("/eventos/r4020?competencia_id={$cid}", 'Pagamento PJ adicionado!', 'sucesso');
+            $dados = [
+                'cnpj_contribuinte'          => $this->postCnpj('cnpj_contribuinte') ?: null,
+                'cnpj_beneficiario'          => $this->postCnpj('cnpj_beneficiario'),
+                'num_nfs'                    => $this->sanitize($this->post('num_nfs', '')),
+                'periodo_apuracao'           => $this->post('periodo_apuracao') ?: null,
+                'razao_social_beneficiario'  => $this->sanitize($this->post('razao_social_beneficiario', '')),
+                'natureza_rendimento'        => $codTipoServico,
+                'cod_tipo_servico'           => $codTipoServico,
+                'cod_pais'                   => $this->post('cod_pais') ?: null,
+                'data_pagamento'             => $this->post('data_pagamento', date('Y-m-d')),
+                'valor_bruto'                => $this->postMoney('valor_bruto'),
+                'valor_base_ir'              => $this->postMoney('valor_base_ir'),
+                'valor_ir'                   => $this->postMoney('valor_ir'),
+                'vl_csrf_agregado'           => $this->postMoney('vl_csrf_agregado'),
+                'valor_csll'                 => $this->postMoney('valor_csll'),
+                'valor_pis'                  => $this->postMoney('valor_pis'),
+                'valor_cofins'               => $this->postMoney('valor_cofins'),
+                'identificador_adicional'    => $this->sanitize($this->post('identificador_adicional', '')),
+                'indicador_judicial'         => !empty($this->post('indicador_judicial')) ? 1 : 0,
+                'numero_processo'            => $this->sanitize($this->post('numero_processo', '')),
+                'indicador_origem_recurso'   => $this->post('indicador_origem_recurso') ?: null,
+                'observacoes'                => $this->sanitize($this->post('observacoes', '')),
+            ];
+
+            if ($id) {
+                $this->eventos->atualizar('r4020', $id, $cid, $dados);
+                $msg = 'Pagamento PJ atualizado!';
+            } else {
+                $this->eventos->inserir('r4020', ['competencia_id' => $cid, ...$dados]);
+                $msg = 'Pagamento PJ adicionado!';
+            }
+
+            $this->redirect("/eventos/r4020?competencia_id={$cid}", $msg, 'sucesso');
         }, "/eventos/r4020?competencia_id={$cid}");
     }
 

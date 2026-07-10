@@ -30,6 +30,15 @@ class EventoRepository
         return (int) $stmt->fetchColumn();
     }
 
+    public function find(string $evento, int $id, int $competenciaId): ?array
+    {
+        $tabela = $this->validarTabela($evento);
+        $stmt   = $this->db->prepare("SELECT * FROM {$tabela} WHERE id = ? AND competencia_id = ?");
+        $stmt->execute([$id, $competenciaId]);
+        $row = $stmt->fetch();
+        return $row ?: null;
+    }
+
     public function inserir(string $evento, array $data): int
     {
         $tabela = $this->validarTabela($evento);

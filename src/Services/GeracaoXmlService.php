@@ -348,14 +348,17 @@ class GeracaoXmlService
         $registros = $stmt->fetchAll();
         if (empty($registros)) return [];
 
-        // Agrupa por CNPJ beneficiário
+        // Agrupa por CNPJ beneficiário + identificador adicional (ideEvtAdic)
         $porBenef = [];
         foreach ($registros as $r) {
-            $porBenef[preg_replace('/\D/', '', $r['cnpj_beneficiario'])][] = $r;
+            $cnpjBenef = preg_replace('/\D/', '', $r['cnpj_beneficiario']);
+            $ideAdic   = trim((string) ($r['identificador_adicional'] ?? ''));
+            $porBenef[$cnpjBenef . '|' . $ideAdic][] = $r;
         }
 
         $xmls = [];
-        foreach ($porBenef as $cnpjBenef => $pagtosBenef) {
+        foreach ($porBenef as $chave => $pagtosBenef) {
+            [$cnpjBenef, $ideAdic] = array_pad(explode('|', $chave, 2), 2, '');
             $nome = $pagtosBenef[0]['razao_social_beneficiario'] ?? '';
             $id = $this->gerarId($cnpj);
 
@@ -370,51 +373,86 @@ class GeracaoXmlService
             foreach ($porNat as $natRend => $pagtos) {
                 $infoPgtoXml = '';
                 foreach ($pagtos as $p) {
-                    $vBruto  = (float)($p['valor_bruto'] ?? 0);
-                    $vBaseIR = (float)($p['valor_base_ir'] ?? $vBruto);
-                    $vIR     = (float)($p['valor_ir'] ?? 0);
-                    $vCSLL   = (float)($p['valor_csll'] ?? 0);
-                    $vCofins = (float)($p['valor_cofins'] ?? 0);
-                    $vPIS    = (float)($p['valor_pis'] ?? 0);
+                    $vBruto  = (float) ($p['valor_bruto'] ?? 0);
+                    $vBaseIR = (float) ($p['valor_base_ir'] ?? $vBruto);
+                    $vIR     = (float) ($p['valor_ir'] ?? 0);
+                    $vCSLL   = (float) ($p['valor_csll'] ?? 0);
+                    $vCofins = (float) ($p['valor_cofins'] ?? 0);
+                    $vPIS    = (float) ($p['valor_pis'] ?? 0);
+                    $vAgreg  = (float) ($p['vl_csrf_agregado'] ?? 0);
                     $indJud  = !empty($p['indicador_judicial']) ? 'S' : 'N';
-
-                    $infoPgtoXml .= "<infoPgto>"
-                                  . "<dtFG>{$p['data_pagamento']}</dtFG>"
-                                  . "<vlrBruto>" . $this->fmtVal($vBruto) . "</vlrBruto>"
-                                  . "<indJud>{$indJud}</indJud>";
-
-                    if ($vIR > 0 || $vCSLL > 0 || $vCofins > 0 || $vPIS > 0) {
-                        $infoPgtoXml .= "<retencoes>"
-                                      . "<vlrBaseIR>" . $this->fmtVal($vBaseIR) . "</vlrBaseIR>"
-                                      . "<vlrIR>" . $this->fmtVal($vIR) . "</vlrIR>";
-                        if ($vCSLL > 0) {
-                            $infoPgtoXml .= "<vlrBaseCSLL>" . $this->fmtVal($vBruto) . "</vlrBaseCSLL>"
-                                          . "<vlrCSLL>" . $this->fmtVal($vCSLL) . "</vlrCSLL>";
-                        }
-                        if ($vCofins > 0) {
-                            $infoPgtoXml .= "<vlrBaseCofins>" . $this->fmtVal($vBruto) . "</vlrBaseCofins>"
-                                          . "<vlrCofins>" . $this->fmtVal($vCofins) . "</vlrCofins>";
-                        }
-                        if ($vPIS > 0) {
-                            $infoPgtoXml .= "<vlrBasePP>" . $this->fmtVal($vBruto) . "</vlrBasePP>"
-                                          . "<vlrPP>" . $this->fmtVal($vPIS) . "</vlrPP>";
-                        }
-                        $infoPgtoXml .= "</retencoes>";
+                    $codPais = preg_replace('/\D/', '', (string) ($p['cod_pais'] ?? ''));
+                    // 105 = Brasil — não informar paisResidExt
+                    if ($codPais === '105') {
+                        $codPais = '';
                     }
 
-                    $infoPgtoXml .= "</infoPgto>";
+                    $infoPgtoXml .= '<infoPgto>'
+                                  . '<dtFG>' . ($p['data_pagamento'] ?? '') . '</dtFG>'
+                                  . '<vlrBruto>' . $this->fmtVal($vBruto) . '</vlrBruto>'
+                                  . "<indJud>{$indJud}</indJud>";
+
+                    if ($codPais !== '') {
+                        $infoPgtoXml .= '<paisResidExt>' . htmlspecialchars($codPais) . '</paisResidExt>';
+                    }
+
+                    if (!empty($p['observacoes'])) {
+                        $infoPgtoXml .= '<observ>' . htmlspecialchars(mb_substr((string) $p['observacoes'], 0, 200)) . '</observ>';
+                    }
+
+                    if ($vIR > 0 || $vCSLL > 0 || $vCofins > 0 || $vPIS > 0 || $vAgreg > 0) {
+                        $infoPgtoXml .= '<retencoes>';
+                        if ($vIR > 0) {
+                            $infoPgtoXml .= '<vlrBaseIR>' . $this->fmtVal($vBaseIR) . '</vlrBaseIR>'
+                                          . '<vlrIR>' . $this->fmtVal($vIR) . '</vlrIR>';
+                        }
+                        if ($vAgreg > 0) {
+                            $infoPgtoXml .= '<vlrBaseAgreg>' . $this->fmtVal($vBruto) . '</vlrBaseAgreg>'
+                                          . '<vlrAgreg>' . $this->fmtVal($vAgreg) . '</vlrAgreg>';
+                        }
+                        if ($vCSLL > 0) {
+                            $infoPgtoXml .= '<vlrBaseCSLL>' . $this->fmtVal($vBruto) . '</vlrBaseCSLL>'
+                                          . '<vlrCSLL>' . $this->fmtVal($vCSLL) . '</vlrCSLL>';
+                        }
+                        if ($vCofins > 0) {
+                            $infoPgtoXml .= '<vlrBaseCofins>' . $this->fmtVal($vBruto) . '</vlrBaseCofins>'
+                                          . '<vlrCofins>' . $this->fmtVal($vCofins) . '</vlrCofins>';
+                        }
+                        if ($vPIS > 0) {
+                            $infoPgtoXml .= '<vlrBasePP>' . $this->fmtVal($vBruto) . '</vlrBasePP>'
+                                          . '<vlrPP>' . $this->fmtVal($vPIS) . '</vlrPP>';
+                        }
+                        $infoPgtoXml .= '</retencoes>';
+                    }
+
+                    // Rendimento decorrente de decisão judicial
+                    $nrProc = preg_replace('/[^A-Za-z0-9]/', '', (string) ($p['numero_processo'] ?? ''));
+                    if ($indJud === 'S' && $nrProc !== '') {
+                        $indOrig = (string) ($p['indicador_origem_recurso'] ?? '1');
+                        if (!in_array($indOrig, ['1', '2'], true)) {
+                            $indOrig = '1';
+                        }
+                        $infoPgtoXml .= '<infoProcJud>'
+                                      . '<nrProc>' . htmlspecialchars($nrProc) . '</nrProc>'
+                                      . "<indOrigRec>{$indOrig}</indOrigRec>"
+                                      . '</infoProcJud>';
+                    }
+
+                    $infoPgtoXml .= '</infoPgto>';
                 }
 
                 $idePgtoXml .= "<idePgto><natRend>{$natRend}</natRend>{$infoPgtoXml}</idePgto>";
             }
 
-            $benefXml = "<ideBenef>"
+            $benefXml = '<ideBenef>'
                       . "<cnpjBenef>{$cnpjBenef}</cnpjBenef>"
-                      . "<nmBenef>" . htmlspecialchars($nome) . "</nmBenef>"
-                      . $idePgtoXml
-                      . "</ideBenef>";
+                      . '<nmBenef>' . htmlspecialchars($nome) . '</nmBenef>';
+            if ($ideAdic !== '') {
+                $benefXml .= '<ideEvtAdic>' . htmlspecialchars(mb_substr($ideAdic, 0, 8)) . '</ideEvtAdic>';
+            }
+            $benefXml .= $idePgtoXml . '</ideBenef>';
 
-            $cnpjEstab = preg_replace('/\D/', '', $registros[0]['cnpj_contribuinte'] ?? $cnpj) ?: $cnpj;
+            $cnpjEstab = preg_replace('/\D/', '', $pagtosBenef[0]['cnpj_contribuinte'] ?? $cnpj) ?: $cnpj;
 
             $body = "        {$this->ideEvento($comp['periodo'], $this->indRetif, $this->nrRecibo)}\n"
                   . "        {$this->ideContri($cnpj)}\n"
