@@ -25,6 +25,7 @@
         <?php endif; ?>
 
         <form action="/login" method="POST">
+    <?= $csrfField ?>
             <div class="mb-3">
                 <label class="form-label">E-mail</label>
                 <div class="input-group">

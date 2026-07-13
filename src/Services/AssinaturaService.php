@@ -32,7 +32,10 @@ class AssinaturaService
             if ($certAtivo) {
                 $pfxPath = $pfxPath ?: $certAtivo['caminho'];
                 if (!$pfxPass && !empty($certAtivo['senha_encrypted'])) {
-                    $pfxPass = $this->decryptSenha($certAtivo['senha_encrypted']);
+                    $pfxPass = CertificadoCrypto::decrypt(
+                        $certAtivo['senha_encrypted'],
+                        CertificadoCrypto::secretFromConfig()
+                    );
                 }
             }
         }
@@ -83,7 +86,10 @@ class AssinaturaService
                 if ($certAtivo) {
                     $pfxPath = $pfxPath ?: $certAtivo['caminho'];
                     if (!$pfxPass && !empty($certAtivo['senha_encrypted'])) {
-                        $pfxPass = $this->decryptSenha($certAtivo['senha_encrypted']);
+                        $pfxPass = CertificadoCrypto::decrypt(
+                            $certAtivo['senha_encrypted'],
+                            CertificadoCrypto::secretFromConfig()
+                        );
                     }
                 }
             } catch (\Exception $e) {
@@ -128,16 +134,6 @@ class AssinaturaService
             'expirado'   => $validTo < time(),
             'dias_rest'  => max(0, (int) ceil(($validTo - time()) / 86400)),
         ];
-    }
-
-    private function decryptSenha(string $encrypted): string
-    {
-        $config = \App\Models\AppConfig::get();
-        $chave  = $config['app']['secret'] ?? 'default_key_change_me_in_production';
-        $data   = base64_decode($encrypted);
-        $iv     = substr($data, 0, 16);
-        $enc    = substr($data, 16);
-        return openssl_decrypt($enc, 'AES-256-CBC', $chave, 0, $iv) ?: '';
     }
 
     private function findCertificado(): ?string

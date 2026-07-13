@@ -14,6 +14,7 @@
 <div class="card">
     <div class="card-body">
         <form action="/processos/salvar" method="POST">
+    <?= $csrfField ?>
             <?php if ($processo): ?>
             <input type="hidden" name="id" value="<?= $processo['id'] ?>">
             <?php endif; ?>

@@ -14,8 +14,8 @@ class ImportacaoService
         $sheet       = $spreadsheet->getActiveSheet();
         $rows        = $sheet->toArray(null, true, true, true);
 
-        // Remover cabeçalho
-        $header = array_shift($rows);
+        // Remover cabeçalho (não usado — layout fixo por coluna)
+        array_shift($rows);
 
         $importados = 0;
         $erros      = [];
@@ -27,7 +27,7 @@ class ImportacaoService
                 $valores = array_filter($row, fn($v) => $v !== null && $v !== '');
                 if (empty($valores)) continue;
 
-                match ($evento) {
+                $ok = match ($evento) {
                     'R2010' => $this->importarR2010($row, $competenciaId),
                     'R2020' => $this->importarR2020($row, $competenciaId),
                     'R2060' => $this->importarR2060($row, $competenciaId),
@@ -35,7 +35,9 @@ class ImportacaoService
                     'R4020' => $this->importarR4020($row, $competenciaId),
                     default => throw new \RuntimeException("Evento {$evento} não suportado para importação."),
                 };
-                $importados++;
+                if ($ok) {
+                    $importados++;
+                }
             } catch (\Throwable $e) {
                 $erros[] = "Linha {$linha}: " . $e->getMessage();
             }
@@ -50,7 +52,7 @@ class ImportacaoService
 
     // ─── R-2010 ──────────────────────────────────────────────
 
-    private function importarR2010(array $row, int $competenciaId): void
+    private function importarR2010(array $row, int $competenciaId): bool
     {
         // Colunas esperadas: A=CNPJ, B=Razão Social, C=Tipo Insc, D=Nº Doc, E=Data, F=Bruto, G=Retenção, H=SENAR
         $stmt = $this->db->prepare("
@@ -69,11 +71,12 @@ class ImportacaoService
             $this->parseMoeda($row['G'] ?? 0),
             $this->parseMoeda($row['H'] ?? 0),
         ]);
+        return true;
     }
 
     // ─── R-2020 ──────────────────────────────────────────────
 
-    private function importarR2020(array $row, int $competenciaId): void
+    private function importarR2020(array $row, int $competenciaId): bool
     {
         // Colunas: A=CNPJ Tomador, B=Razão Social, C=Tipo Insc, D=Nº Doc, E=Data, F=Bruto, G=Retenção
         $stmt = $this->db->prepare("
@@ -91,11 +94,12 @@ class ImportacaoService
             $this->parseMoeda($row['F'] ?? 0),
             $this->parseMoeda($row['G'] ?? 0),
         ]);
+        return true;
     }
 
     // ─── R-2060 ──────────────────────────────────────────────
 
-    private function importarR2060(array $row, int $competenciaId): void
+    private function importarR2060(array $row, int $competenciaId): bool
     {
         // Colunas: A=CNAE, B=Rec Bruta, C=Exclusões, D=Alíquota
         $recBruta   = $this->parseMoeda($row['B'] ?? 0);
@@ -118,11 +122,12 @@ class ImportacaoService
             $aliquota,
             $cprb,
         ]);
+        return true;
     }
 
     // ─── R-4010 ──────────────────────────────────────────────
 
-    private function importarR4010(array $row, int $competenciaId): void
+    private function importarR4010(array $row, int $competenciaId): bool
     {
         // Colunas: A=CPF, B=Nome, C=Natureza, D=Data Pagto, E=Bruto, F=Base IR, G=IR, H=Dedução
         $stmt = $this->db->prepare("
@@ -141,11 +146,12 @@ class ImportacaoService
             $this->parseMoeda($row['G'] ?? 0),
             $this->parseMoeda($row['H'] ?? 0),
         ]);
+        return true;
     }
 
     // ─── R-4020 ──────────────────────────────────────────────
 
-   private function importarR4020(array $row, int $competenciaId): void
+    private function importarR4020(array $row, int $competenciaId): bool
     {
         // Formato oficial (planilha RFB - 22 colunas):
         // A=CNPJ Contribuinte, B=CNPJ Prestador, C=Nº NFS, D=Período Apuração,
@@ -158,7 +164,7 @@ class ImportacaoService
 
         // Pular linhas em branco
         if (empty($cnpjBenef) || strlen($cnpjBenef) < 11) {
-            return;
+            return false;
         }
 
         $codTipoServico = str_pad(trim((string)($row['G'] ?? '')), 5, '0', STR_PAD_LEFT);
@@ -200,6 +206,7 @@ class ImportacaoService
             !empty($row['U']) ? (int)$row['U'] : null,
             (string)($row['V'] ?? '') ?: null,
         ]);
+        return true;
     }
     private function parseMoeda(mixed $val): float
     {

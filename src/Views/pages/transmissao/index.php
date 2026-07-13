@@ -46,6 +46,7 @@ $certOk = !empty($certInfo['valido']);
         </div>
         <?php else: ?>
         <form action="/transmissao/enviar" method="POST" onsubmit="return confirm('Confirma o envio do(s) evento(s) selecionado(s) para a SEFAZ?')">
+    <?= $csrfField ?>
             <input type="hidden" name="competencia_id" value="<?= $competenciaId ?>">
             <div class="table-responsive mb-3">
                 <table class="table table-sm table-hover mb-0">
@@ -84,6 +85,7 @@ $certOk = !empty($certInfo['valido']);
     <div class="card-header"><i class="bi bi-search me-2"></i>Consultar Protocolo</div>
     <div class="card-body">
         <form action="/transmissao/consultar" method="POST" class="row g-2 align-items-end">
+    <?= $csrfField ?>
             <input type="hidden" name="competencia_id" value="<?= $competenciaId ?>">
             <div class="col-md-6">
                 <label class="form-label">Número do Protocolo</label>

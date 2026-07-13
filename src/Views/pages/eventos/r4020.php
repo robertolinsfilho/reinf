@@ -29,6 +29,7 @@ $fmtMoney = static fn($v) => $v !== null && $v !== '' ? number_format((float) $v
             </div>
             <div class="card-body p-3">
                 <form action="/eventos/r4020/salvar" method="POST">
+    <?= $csrfField ?>
                     <input type="hidden" name="competencia_id" value="<?= $competencia['id'] ?>">
                     <?php if ($isEdit): ?>
                     <input type="hidden" name="id" value="<?= (int) $e['id'] ?>">
@@ -238,6 +239,7 @@ $fmtMoney = static fn($v) => $v !== null && $v !== '' ? number_format((float) $v
                                     <i class="bi bi-pencil"></i>
                                 </a>
                                 <form action="/eventos/r4020/excluir" method="POST" class="d-inline" onsubmit="return confirm('Excluir?')">
+    <?= $csrfField ?>
                                     <input type="hidden" name="id" value="<?= (int) $r['id'] ?>">
                                     <input type="hidden" name="competencia_id" value="<?= (int) $competencia['id'] ?>">
                                     <button type="submit" class="btn btn-outline-danger btn-sm py-0 px-1" title="Excluir"><i class="bi bi-trash3"></i></button>

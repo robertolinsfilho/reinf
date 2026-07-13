@@ -24,12 +24,13 @@ WORKDIR /var/www/html
 
 COPY . .
 
-RUN composer update --no-dev --optimize-autoloader --no-interaction
+RUN composer install --no-dev --optimize-autoloader --no-interaction
 
-RUN mkdir -p /var/www/html/public/uploads/xml \
+RUN mkdir -p /var/www/html/storage/xml \
+    && mkdir -p /var/www/html/storage/uploads \
     && mkdir -p /var/www/html/storage/certs \
+    && mkdir -p /var/www/html/storage/xsd \
     && chown -R www-data:www-data /var/www/html \
-    && chmod -R 775 /var/www/html/public/uploads \
     && chmod -R 775 /var/www/html/storage
 
 EXPOSE 9000

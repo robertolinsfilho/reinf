@@ -19,6 +19,7 @@
             <div class="card-header">Adicionar Pagamento PF</div>
             <div class="card-body p-4">
                 <form action="/eventos/r4010/salvar" method="POST">
+    <?= $csrfField ?>
                     <input type="hidden" name="competencia_id" value="<?= $competencia['id'] ?>">
                     <div class="mb-2">
                         <label class="form-label">CPF do Beneficiário *</label>
@@ -107,6 +108,7 @@
                             <td class="text-end small text-danger">R$ <?= number_format($r['valor_ir'], 2, ',', '.') ?></td>
                             <td>
                                 <form action="/eventos/r4010/excluir" method="POST" onsubmit="return confirm('Excluir?')">
+    <?= $csrfField ?>
                                     <input type="hidden" name="id" value="<?= $r['id'] ?>">
                                     <input type="hidden" name="competencia_id" value="<?= $competencia['id'] ?>">
                                     <button class="btn btn-outline-danger btn-sm py-0 px-1"><i class="bi bi-trash3"></i></button>

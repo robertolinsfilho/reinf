@@ -54,6 +54,7 @@
     </a>
 
     <form action="/gerar/xml" method="POST" class="d-inline">
+    <?= $csrfField ?>
         <input type="hidden" name="competencia_id" value="<?= $pendente['competencia_id'] ?>">
         <input type="hidden" name="ind_retif" value="<?= $pendente['ind_retif'] ?>">
         <input type="hidden" name="nr_recibo_original" value="<?= htmlspecialchars($pendente['nr_recibo_original'] ?? '') ?>">

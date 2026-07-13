@@ -18,6 +18,7 @@
             <div class="card-header">Adicionar Registro</div>
             <div class="card-body p-4">
                 <form action="/eventos/r2010/salvar" method="POST">
+    <?= $csrfField ?>
                     <input type="hidden" name="competencia_id" value="<?= $competencia['id'] ?>">
                     <div class="mb-2">
                         <label class="form-label">CNPJ / CPF do Prestador *</label>

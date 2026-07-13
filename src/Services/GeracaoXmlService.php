@@ -10,10 +10,11 @@ class GeracaoXmlService
     private ?string $nrRecibo = null;
     private string $verProc;
     private int $procEmi;
+    private int $idSeq = 0;
 
     public function __construct(private \PDO $db)
     {
-        $this->outputDir = BASE_PATH . '/public/uploads/xml/';
+        $this->outputDir = BASE_PATH . '/storage/xml/';
         if (!is_dir($this->outputDir)) {
             mkdir($this->outputDir, 0755, true);
         }
@@ -81,7 +82,8 @@ class GeracaoXmlService
     {
         // ID = 'ID' + [1-2] + 14 dígitos CNPJ + timestamp YYYYMMDDhhmmss + sequencial 5 dígitos
         // Total: 2 + 1 + 14 + 14 + 5 = 36 chars (padrão XSD)
-        return 'ID1' . str_pad($cnpj, 14, '0', STR_PAD_LEFT) . date('YmdHis') . str_pad((string)random_int(0, 99999), 5, '0', STR_PAD_LEFT);
+        $this->idSeq = ($this->idSeq + 1) % 100000;
+        return 'ID1' . str_pad($cnpj, 14, '0', STR_PAD_LEFT) . date('YmdHis') . str_pad((string) $this->idSeq, 5, '0', STR_PAD_LEFT);
     }
     
 
@@ -328,16 +330,6 @@ class GeracaoXmlService
     }
 
     // ═══ R-4020 · Pagamentos PJ (estrutura oficial) ═══
-      private function gerarR4020(array $comp): string
-    {
-        // Este método agora só gera o XML de UM beneficiário — o primeiro.
-        // Para múltiplos, use gerarR4020PorBeneficiario() no controller.
-        $arquivos = $this->gerarR4020PorBeneficiario($comp);
-        if (empty($arquivos)) {
-            throw new \RuntimeException("Nenhum registro R-4020 encontrado.");
-        }
-        return $arquivos[0];
-    }
 
     public function gerarR4020PorBeneficiario(array $comp): array
     {
@@ -459,7 +451,6 @@ class GeracaoXmlService
                   . "        <ideEstab><tpInscEstab>1</tpInscEstab><nrInscEstab>{$cnpjEstab}</nrInscEstab>{$benefXml}</ideEstab>";
 
             $xmls[] = $this->envelope('evtRetPJ', 'evt4020PagtoBeneficiarioPJ', $id, $body);
-            usleep(1000); // garantir IDs únicos
         }
 
         return $xmls;

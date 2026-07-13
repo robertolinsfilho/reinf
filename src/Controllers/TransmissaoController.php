@@ -73,7 +73,7 @@ class TransmissaoController extends BaseController
             $this->redirect('/transmissao', 'Competência não encontrada.', 'erro');
         }
 
-        $arquivos = $this->arquivos->findByIds($arquivoIds);
+        $arquivos = $this->arquivos->findByIdsForUser($arquivoIds, $this->userId());
         $xmls     = array_filter(array_map(function ($a) {
             return $a['xml_conteudo'] ?: (file_exists($a['caminho']) ? file_get_contents($a['caminho']) : '');
         }, $arquivos));

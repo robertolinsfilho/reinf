@@ -99,7 +99,7 @@ class ProcessoController extends BaseController
     public function excluir(): void
     {
         $this->requireLogin();
-        $id   = (int) $this->get('id');
+        $id   = (int) $this->post('id');
         $proc = $this->repo->findByUser($id, $this->userId());
         if (!$proc) {
             $this->redirect('/processos', 'Processo não encontrado.', 'erro');

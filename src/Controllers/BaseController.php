@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Controllers;
 
 use App\Models\Database;
@@ -18,10 +20,11 @@ abstract class BaseController
     protected function view(string $template, array $data = []): void
     {
         extract($data);
-        $config  = $this->config;
-        $baseUrl = $this->config['app']['url'];
-        $appName = $this->config['app']['name'];
-        $usuario = $_SESSION['usuario'] ?? null;
+        $config    = $this->config;
+        $baseUrl   = $this->config['app']['url'];
+        $appName   = $this->config['app']['name'];
+        $usuario   = $_SESSION['usuario'] ?? null;
+        $csrfField = $this->csrfField();
 
         $viewPath = BASE_PATH . '/src/Views/' . $template . '.php';
         if (!file_exists($viewPath)) {
@@ -68,11 +71,6 @@ abstract class BaseController
         if (!$this->isLoggedIn()) {
             $this->redirect('/login');
         }
-    }
-
-    protected function requireAuth(): void
-    {
-        $this->requireLogin();
     }
 
     protected function requireAdmin(): void
@@ -126,10 +124,10 @@ abstract class BaseController
         return '<input type="hidden" name="_token" value="' . $this->csrfToken() . '">';
     }
 
-    protected function verifyCsrf(): void
+    public function verifyCsrf(): void
     {
-        $token = $this->post('_token', '');
-        if (!hash_equals($this->csrfToken(), $token)) {
+        $token = (string) $this->post('_token', '');
+        if ($token === '' || !hash_equals($this->csrfToken(), $token)) {
             $this->flash('erro', 'Token de segurança inválido. Tente novamente.');
             $this->redirect($_SERVER['HTTP_REFERER'] ?? '/dashboard');
         }
@@ -142,10 +140,10 @@ abstract class BaseController
         try {
             $fn();
         } catch (\PDOException $e) {
-            error_log("DB Error: " . $e->getMessage());
-            $this->redirect($redirectUrl, "{$errorPrefix}: " . $e->getMessage(), 'erro');
+            error_log('DB Error: ' . $e->getMessage());
+            $this->redirect($redirectUrl, "{$errorPrefix}: falha ao gravar dados.", 'erro');
         } catch (\Exception $e) {
-            error_log("Error: " . $e->getMessage());
+            error_log('Error: ' . $e->getMessage());
             $this->redirect($redirectUrl, "{$errorPrefix}: " . $e->getMessage(), 'erro');
         }
     }

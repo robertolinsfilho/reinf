@@ -1,9 +1,22 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Models;
 
 class EventoRepository
 {
+    private const TABELAS = ['r2010', 'r2020', 'r2060', 'r4010', 'r4020'];
+
+    private const ORDER_WHITELIST = [
+        'created_at ASC',
+        'created_at DESC',
+        'data_pagamento ASC',
+        'data_pagamento DESC',
+        'id ASC',
+        'id DESC',
+    ];
+
     private \PDO $db;
 
     public function __construct(\PDO $db)
@@ -13,8 +26,9 @@ class EventoRepository
 
     public function listar(string $evento, int $competenciaId, string $orderBy = 'created_at DESC', int $limit = 100, int $offset = 0): array
     {
-        $tabela = $this->validarTabela($evento);
-        $stmt   = $this->db->prepare("SELECT * FROM {$tabela} WHERE competencia_id = ? ORDER BY {$orderBy} LIMIT ? OFFSET ?");
+        $tabela  = $this->validarTabela($evento);
+        $orderBy = $this->validarOrderBy($orderBy);
+        $stmt    = $this->db->prepare("SELECT * FROM {$tabela} WHERE competencia_id = ? ORDER BY {$orderBy} LIMIT ? OFFSET ?");
         $stmt->bindValue(1, $competenciaId, \PDO::PARAM_INT);
         $stmt->bindValue(2, $limit, \PDO::PARAM_INT);
         $stmt->bindValue(3, $offset, \PDO::PARAM_INT);
@@ -78,10 +92,18 @@ class EventoRepository
     private function validarTabela(string $evento): string
     {
         $tabela = strtolower(trim($evento));
-        $validas = ['r2010', 'r2020', 'r2060', 'r4010', 'r4020'];
-        if (!in_array($tabela, $validas)) {
+        if (!in_array($tabela, self::TABELAS, true)) {
             throw new \InvalidArgumentException("Tabela de evento inválida: {$evento}");
         }
         return $tabela;
+    }
+
+    private function validarOrderBy(string $orderBy): string
+    {
+        $normalized = preg_replace('/\s+/', ' ', trim($orderBy)) ?? '';
+        if (!in_array($normalized, self::ORDER_WHITELIST, true)) {
+            return 'created_at DESC';
+        }
+        return $normalized;
     }
 }

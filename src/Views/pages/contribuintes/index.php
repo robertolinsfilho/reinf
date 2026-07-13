@@ -50,10 +50,14 @@
                         <a href="/contribuintes/editar?id=<?= $c['id'] ?>" class="btn btn-sm btn-outline-secondary ms-1">
                             <i class="bi bi-pencil"></i>
                         </a>
-                        <a href="/contribuintes/excluir?id=<?= $c['id'] ?>" class="btn btn-sm btn-outline-danger ms-1"
-                           onclick="return confirm('Excluir este contribuinte e todos os seus dados?')">
-                            <i class="bi bi-trash"></i>
-                        </a>
+                        <form action="/contribuintes/excluir" method="POST" class="d-inline ms-1"
+                              onsubmit="return confirm('Excluir este contribuinte e todos os seus dados?')">
+                            <?= $csrfField ?>
+                            <input type="hidden" name="id" value="<?= (int) $c['id'] ?>">
+                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Excluir">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </form>
                     </td>
                 </tr>
                 <?php endforeach; endif; ?>

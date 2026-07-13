@@ -19,6 +19,7 @@ if (isset($_SESSION['flash'])) { $flash = $_SESSION['flash']; unset($_SESSION['f
             <div class="card-header">Upload de Certificado (PFX / P12)</div>
             <div class="card-body p-4">
                 <form action="/certificados/upload" method="POST" enctype="multipart/form-data">
+    <?= $csrfField ?>
                     <div class="mb-3">
                         <label class="form-label">Arquivo do Certificado *</label>
                         <input type="file" name="certificado" class="form-control" accept=".pfx,.p12" required>

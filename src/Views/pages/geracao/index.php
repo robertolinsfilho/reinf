@@ -22,6 +22,7 @@ if (isset($_SESSION['flash'])) { $flash = $_SESSION['flash']; unset($_SESSION['f
             <div class="card-header">Selecionar Eventos</div>
             <div class="card-body p-4">
                 <form action="/gerar/xml" method="POST">
+    <?= $csrfField ?>
                     <input type="hidden" name="competencia_id" value="<?= $competencia['id'] ?>">
 
                     <div class="mb-3">

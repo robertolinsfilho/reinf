@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Services;
 
 class TransmissaoService
@@ -25,7 +27,6 @@ class TransmissaoService
     {
         $cnpj = preg_replace('/\D/', '', $cnpj);
 
-        // Assina cada XML se solicitado
         $eventosAssinados = [];
         foreach ($xmls as $i => $xml) {
             if ($assinar) {
@@ -48,10 +49,10 @@ class TransmissaoService
         $loteXml = $this->montarLote($cnpj, $eventosAssinados);
         $url     = $this->urlEnvio[$this->tpAmb] ?? '';
         $inicio  = microtime(true);
-        $retorno = $this->httpPost($url, $loteXml);
+        $retorno = $this->httpRequest('POST', $url, $loteXml);
         $tempo   = (int) ((microtime(true) - $inicio) * 1000);
 
-        $sucessoEnvio = in_array($retorno['http_code'], [200, 201, 202]);
+        $sucessoEnvio = in_array($retorno['http_code'], [200, 201, 202], true);
 
         return [
             'sucesso'                  => $sucessoEnvio,
@@ -82,10 +83,10 @@ class TransmissaoService
         $url  = ($this->urlConsulta[$this->tpAmb] ?? '') . $protocolo;
 
         $inicio  = microtime(true);
-        $retorno = $this->httpGet($url);
+        $retorno = $this->httpRequest('GET', $url);
         $tempo   = (int) ((microtime(true) - $inicio) * 1000);
 
-        $sucesso = in_array($retorno['http_code'], [200, 201, 202]);
+        $sucesso = in_array($retorno['http_code'], [200, 201, 202], true);
 
         $recibos = [];
         if (preg_match_all('/<nrRecibo>([^<]+)<\/nrRecibo>/', $retorno['body'], $m)) {
@@ -126,8 +127,6 @@ class TransmissaoService
         ];
     }
 
-    // ─── Helpers privados ────────────────────────────────────
-
     private function montarLote(string $cnpj, array $eventosXml): string
     {
         $eventosStr = '';
@@ -151,82 +150,51 @@ class TransmissaoService
              . "</Reinf>";
     }
 
-    private function httpPost(string $url, string $xml): array
+    private function httpRequest(string $method, string $url, ?string $body = null): array
     {
-        if (empty($url)) {
-            return ['http_code' => 0, 'body' => 'URL de envio não configurada'];
+        if ($url === '') {
+            return [
+                'http_code' => 0,
+                'body'      => $method === 'POST' ? 'URL de envio não configurada' : 'URL de consulta não configurada',
+            ];
         }
 
         $certFiles = $this->extrairCertificadoTemporario();
         if (!$certFiles) {
-            return ['http_code' => 0, 'body' => 'Erro: certificado ativo não encontrado ou senha inválida'];
+            return [
+                'http_code' => 0,
+                'body'      => $method === 'POST'
+                    ? 'Erro: certificado ativo não encontrado ou senha inválida'
+                    : 'Erro: certificado ativo não encontrado',
+            ];
         }
 
         $userAgent = \App\Models\AppConfig::get()['reinf']['user_agent'] ?? 'EFD-REINF-WEB/1.0';
 
         $ch = curl_init($url);
-        curl_setopt_array($ch, [
-            CURLOPT_POST           => true,
-            CURLOPT_POSTFIELDS     => $xml,
+        $opts = [
             CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT        => 120,
+            CURLOPT_TIMEOUT        => $method === 'POST' ? 120 : 60,
             CURLOPT_USERAGENT      => $userAgent,
-            CURLOPT_HTTPHEADER     => [
-                'Content-Type: application/xml',
-                'Accept: application/xml',
-            ],
+            CURLOPT_HTTPHEADER     => $method === 'POST'
+                ? ['Content-Type: application/xml', 'Accept: application/xml']
+                : ['Accept: application/xml'],
             CURLOPT_SSL_VERIFYPEER => true,
             CURLOPT_SSLCERT        => $certFiles['cert'],
             CURLOPT_SSLKEY         => $certFiles['key'],
             CURLOPT_SSLCERTTYPE    => 'PEM',
             CURLOPT_SSLKEYTYPE     => 'PEM',
             CURLOPT_SSLVERSION     => CURL_SSLVERSION_TLSv1_2,
-        ]);
+        ];
 
-        $body     = curl_exec($ch);
-        $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $error    = curl_error($ch);
-        curl_close($ch);
-
-        // Limpa arquivos temporários
-        @unlink($certFiles['cert']);
-        @unlink($certFiles['key']);
-
-        if ($body === false) {
-            return ['http_code' => 0, 'body' => 'Erro cURL: ' . $error];
+        if ($method === 'POST') {
+            $opts[CURLOPT_POST]       = true;
+            $opts[CURLOPT_POSTFIELDS] = $body ?? '';
         }
 
-        return ['http_code' => $httpCode, 'body' => $body];
-    }
+        curl_setopt_array($ch, $opts);
 
-    private function httpGet(string $url): array
-    {
-        if (empty($url)) {
-            return ['http_code' => 0, 'body' => 'URL de consulta não configurada'];
-        }
-
-        $certFiles = $this->extrairCertificadoTemporario();
-        if (!$certFiles) {
-            return ['http_code' => 0, 'body' => 'Erro: certificado ativo não encontrado'];
-        }
-
-        $userAgent = \App\Models\AppConfig::get()['reinf']['user_agent'] ?? 'EFD-REINF-WEB/1.0';
-
-        $ch = curl_init($url);
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT        => 60,
-            CURLOPT_USERAGENT      => $userAgent,
-            CURLOPT_HTTPHEADER     => ['Accept: application/xml'],
-            CURLOPT_SSL_VERIFYPEER => true,
-            CURLOPT_SSLCERT        => $certFiles['cert'],
-            CURLOPT_SSLKEY         => $certFiles['key'],
-            CURLOPT_SSLCERTTYPE    => 'PEM',
-            CURLOPT_SSLKEYTYPE     => 'PEM',
-            CURLOPT_SSLVERSION     => CURL_SSLVERSION_TLSv1_2,
-        ]);
-
-        $body     = curl_exec($ch);
+        $response = curl_exec($ch);
         $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
         $error    = curl_error($ch);
         curl_close($ch);
@@ -234,11 +202,11 @@ class TransmissaoService
         @unlink($certFiles['cert']);
         @unlink($certFiles['key']);
 
-        if ($body === false) {
+        if ($response === false) {
             return ['http_code' => 0, 'body' => 'Erro cURL: ' . $error];
         }
 
-        return ['http_code' => $httpCode, 'body' => $body];
+        return ['http_code' => $httpCode, 'body' => $response];
     }
 
     /**
@@ -253,15 +221,12 @@ class TransmissaoService
             return null;
         }
 
-        // Descriptografa senha
         $senha = '';
         if (!empty($certAtivo['senha_encrypted'])) {
-            $config = \App\Models\AppConfig::get();
-            $chave  = $config['app']['secret'] ?? 'default_key_change_me_in_production';
-            $data   = base64_decode($certAtivo['senha_encrypted']);
-            $iv     = substr($data, 0, 16);
-            $enc    = substr($data, 16);
-            $senha  = openssl_decrypt($enc, 'AES-256-CBC', $chave, 0, $iv) ?: '';
+            $senha = CertificadoCrypto::decrypt(
+                $certAtivo['senha_encrypted'],
+                CertificadoCrypto::secretFromConfig()
+            );
         }
 
         $pfxContent = file_get_contents($certAtivo['caminho']);
@@ -270,8 +235,7 @@ class TransmissaoService
             return null;
         }
 
-        // Salva PEM (cert público) e KEY (chave privada) em temp
-        $tmpDir  = sys_get_temp_dir();
+        $tmpDir   = sys_get_temp_dir();
         $certFile = tempnam($tmpDir, 'reinf_cert_') . '.pem';
         $keyFile  = tempnam($tmpDir, 'reinf_key_') . '.pem';
 

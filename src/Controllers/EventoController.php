@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Controllers;
 
 use App\Models\EventoRepository;
@@ -68,23 +70,38 @@ class EventoController extends BaseController
         ];
     }
 
-    // ═══ R-2010 ══════════════════════════════════════════════
-
-    public function r2010(): void
+    private function listarEvento(string $tabela, string $view, string $titulo, string $orderBy = 'created_at DESC', array $extra = []): void
     {
         $this->requireLogin();
         $cid = (int) $this->get('competencia_id');
-        $p   = $this->paginacao($cid, 'r2010');
+        $p   = $this->paginacao($cid, $tabela);
 
-        $this->view('pages/eventos/r2010', [
-            'pageTitle'   => 'R-2010 – Retenções INSS Contratados',
+        $this->view($view, array_merge([
+            'pageTitle'   => $titulo,
             'competencia' => $this->getComp($cid),
-            'registros'   => $this->eventos->listar('r2010', $cid, 'created_at DESC', $p['limit'], $p['offset']),
+            'registros'   => $this->eventos->listar($tabela, $cid, $orderBy, $p['limit'], $p['offset']),
             'total'       => $p['total'],
             'page'        => $p['page'],
             'totalPages'  => $p['totalPages'],
             'flash'       => $this->getFlash(),
-        ]);
+        ], $extra));
+    }
+
+    private function excluirEvento(string $tabela, string $path): void
+    {
+        $this->requireLogin();
+        $id  = (int) $this->post('id');
+        $cid = (int) $this->post('competencia_id');
+        $this->getComp($cid);
+        $this->eventos->excluir($tabela, $id, $cid);
+        $this->redirect("{$path}?competencia_id={$cid}", 'Registro excluído.', 'sucesso');
+    }
+
+    // ═══ R-2010 ══════════════════════════════════════════════
+
+    public function r2010(): void
+    {
+        $this->listarEvento('r2010', 'pages/eventos/r2010', 'R-2010 – Retenções INSS Contratados');
     }
 
     public function salvarR2010(): void
@@ -118,31 +135,14 @@ class EventoController extends BaseController
 
     public function excluirR2010(): void
     {
-        $this->requireLogin();
-        $id  = (int) ($this->post('id') ?? $this->get('id'));
-        $cid = (int) ($this->post('competencia_id') ?? $this->get('competencia_id'));
-        $this->getComp($cid);
-        $this->eventos->excluir('r2010', $id, $cid);
-        $this->redirect("/eventos/r2010?competencia_id={$cid}", 'Registro excluído.', 'sucesso');
+        $this->excluirEvento('r2010', '/eventos/r2010');
     }
 
     // ═══ R-2020 ══════════════════════════════════════════════
 
     public function r2020(): void
     {
-        $this->requireLogin();
-        $cid = (int) $this->get('competencia_id');
-        $p   = $this->paginacao($cid, 'r2020');
-
-        $this->view('pages/eventos/r2020', [
-            'pageTitle'   => 'R-2020 – Retenções INSS Contratantes',
-            'competencia' => $this->getComp($cid),
-            'registros'   => $this->eventos->listar('r2020', $cid, 'created_at DESC', $p['limit'], $p['offset']),
-            'total'       => $p['total'],
-            'page'        => $p['page'],
-            'totalPages'  => $p['totalPages'],
-            'flash'       => $this->getFlash(),
-        ]);
+        $this->listarEvento('r2020', 'pages/eventos/r2020', 'R-2020 – Retenções INSS Contratantes');
     }
 
     public function salvarR2020(): void
@@ -168,31 +168,14 @@ class EventoController extends BaseController
 
     public function excluirR2020(): void
     {
-        $this->requireLogin();
-        $id  = (int) ($this->post('id') ?? $this->get('id'));
-        $cid = (int) ($this->post('competencia_id') ?? $this->get('competencia_id'));
-        $this->getComp($cid);
-        $this->eventos->excluir('r2020', $id, $cid);
-        $this->redirect("/eventos/r2020?competencia_id={$cid}", 'Registro excluído.', 'sucesso');
+        $this->excluirEvento('r2020', '/eventos/r2020');
     }
 
     // ═══ R-2060 ══════════════════════════════════════════════
 
     public function r2060(): void
     {
-        $this->requireLogin();
-        $cid = (int) $this->get('competencia_id');
-        $p   = $this->paginacao($cid, 'r2060');
-
-        $this->view('pages/eventos/r2060', [
-            'pageTitle'   => 'R-2060 – CPRB',
-            'competencia' => $this->getComp($cid),
-            'registros'   => $this->eventos->listar('r2060', $cid, 'created_at DESC', $p['limit'], $p['offset']),
-            'total'       => $p['total'],
-            'page'        => $p['page'],
-            'totalPages'  => $p['totalPages'],
-            'flash'       => $this->getFlash(),
-        ]);
+        $this->listarEvento('r2060', 'pages/eventos/r2060', 'R-2060 – CPRB');
     }
 
     public function salvarR2060(): void
@@ -222,33 +205,21 @@ class EventoController extends BaseController
 
     public function excluirR2060(): void
     {
-        $this->requireLogin();
-        $id  = (int) ($this->post('id') ?? $this->get('id'));
-        $cid = (int) ($this->post('competencia_id') ?? $this->get('competencia_id'));
-        $this->getComp($cid);
-        $this->eventos->excluir('r2060', $id, $cid);
-        $this->redirect("/eventos/r2060?competencia_id={$cid}", 'Registro excluído.', 'sucesso');
+        $this->excluirEvento('r2060', '/eventos/r2060');
     }
 
     // ═══ R-4010 ══════════════════════════════════════════════
 
     public function r4010(): void
     {
-        $this->requireLogin();
-        $cid       = (int) $this->get('competencia_id');
-        $p         = $this->paginacao($cid, 'r4010');
         $naturezas = (new NaturezaRendimentoRepository($this->db))->agrupadoPorTipo('pf');
-
-        $this->view('pages/eventos/r4010', [
-            'pageTitle'   => 'R-4010 – Pagamentos/Créditos PF (IRRF)',
-            'competencia' => $this->getComp($cid),
-            'registros'   => $this->eventos->listar('r4010', $cid, 'data_pagamento DESC', $p['limit'], $p['offset']),
-            'naturezas'   => $naturezas,
-            'total'       => $p['total'],
-            'page'        => $p['page'],
-            'totalPages'  => $p['totalPages'],
-            'flash'       => $this->getFlash(),
-        ]);
+        $this->listarEvento(
+            'r4010',
+            'pages/eventos/r4010',
+            'R-4010 – Pagamentos/Créditos PF (IRRF)',
+            'data_pagamento DESC',
+            ['naturezas' => $naturezas]
+        );
     }
 
     public function salvarR4010(): void
@@ -276,12 +247,7 @@ class EventoController extends BaseController
 
     public function excluirR4010(): void
     {
-        $this->requireLogin();
-        $id  = (int) ($this->post('id') ?? $this->get('id'));
-        $cid = (int) ($this->post('competencia_id') ?? $this->get('competencia_id'));
-        $this->getComp($cid);
-        $this->eventos->excluir('r4010', $id, $cid);
-        $this->redirect("/eventos/r4010?competencia_id={$cid}", 'Registro excluído.', 'sucesso');
+        $this->excluirEvento('r4010', '/eventos/r4010');
     }
 
     // ═══ R-4020 (Formato Oficial RFB) ═══════════════════════
@@ -306,7 +272,7 @@ class EventoController extends BaseController
             $naturezas[$r['grupo']][] = ['codigo' => $r['codigo'], 'descricao' => $r['descricao']];
         }
 
-        $editId  = (int) $this->get('id');
+        $editId   = (int) $this->get('id');
         $editando = $editId ? $this->eventos->find('r4020', $editId, $cid) : null;
 
         $this->view('pages/eventos/r4020', [
@@ -330,30 +296,30 @@ class EventoController extends BaseController
 
         $this->safeExecute(function () use ($cid) {
             $id             = (int) $this->post('id', 0);
-            $codTipoServico = str_pad($this->post('cod_tipo_servico', ''), 5, '0', STR_PAD_LEFT);
+            $codTipoServico = str_pad((string) $this->post('cod_tipo_servico', ''), 5, '0', STR_PAD_LEFT);
 
             $dados = [
-                'cnpj_contribuinte'          => $this->postCnpj('cnpj_contribuinte') ?: null,
-                'cnpj_beneficiario'          => $this->postCnpj('cnpj_beneficiario'),
-                'num_nfs'                    => $this->sanitize($this->post('num_nfs', '')),
-                'periodo_apuracao'           => $this->post('periodo_apuracao') ?: null,
-                'razao_social_beneficiario'  => $this->sanitize($this->post('razao_social_beneficiario', '')),
-                'natureza_rendimento'        => $codTipoServico,
-                'cod_tipo_servico'           => $codTipoServico,
-                'cod_pais'                   => $this->post('cod_pais') ?: null,
-                'data_pagamento'             => $this->post('data_pagamento', date('Y-m-d')),
-                'valor_bruto'                => $this->postMoney('valor_bruto'),
-                'valor_base_ir'              => $this->postMoney('valor_base_ir'),
-                'valor_ir'                   => $this->postMoney('valor_ir'),
-                'vl_csrf_agregado'           => $this->postMoney('vl_csrf_agregado'),
-                'valor_csll'                 => $this->postMoney('valor_csll'),
-                'valor_pis'                  => $this->postMoney('valor_pis'),
-                'valor_cofins'               => $this->postMoney('valor_cofins'),
-                'identificador_adicional'    => $this->sanitize($this->post('identificador_adicional', '')),
-                'indicador_judicial'         => !empty($this->post('indicador_judicial')) ? 1 : 0,
-                'numero_processo'            => $this->sanitize($this->post('numero_processo', '')),
-                'indicador_origem_recurso'   => $this->post('indicador_origem_recurso') ?: null,
-                'observacoes'                => $this->sanitize($this->post('observacoes', '')),
+                'cnpj_contribuinte'         => $this->postCnpj('cnpj_contribuinte') ?: null,
+                'cnpj_beneficiario'         => $this->postCnpj('cnpj_beneficiario'),
+                'num_nfs'                   => $this->sanitize($this->post('num_nfs', '')),
+                'periodo_apuracao'          => $this->post('periodo_apuracao') ?: null,
+                'razao_social_beneficiario' => $this->sanitize($this->post('razao_social_beneficiario', '')),
+                'natureza_rendimento'       => $codTipoServico,
+                'cod_tipo_servico'          => $codTipoServico,
+                'cod_pais'                  => $this->post('cod_pais') ?: null,
+                'data_pagamento'            => $this->post('data_pagamento', date('Y-m-d')),
+                'valor_bruto'               => $this->postMoney('valor_bruto'),
+                'valor_base_ir'             => $this->postMoney('valor_base_ir'),
+                'valor_ir'                  => $this->postMoney('valor_ir'),
+                'vl_csrf_agregado'          => $this->postMoney('vl_csrf_agregado'),
+                'valor_csll'                => $this->postMoney('valor_csll'),
+                'valor_pis'                 => $this->postMoney('valor_pis'),
+                'valor_cofins'              => $this->postMoney('valor_cofins'),
+                'identificador_adicional'   => $this->sanitize($this->post('identificador_adicional', '')),
+                'indicador_judicial'        => !empty($this->post('indicador_judicial')) ? 1 : 0,
+                'numero_processo'           => $this->sanitize($this->post('numero_processo', '')),
+                'indicador_origem_recurso'  => $this->post('indicador_origem_recurso') ?: null,
+                'observacoes'               => $this->sanitize($this->post('observacoes', '')),
             ];
 
             if ($id) {
@@ -370,11 +336,6 @@ class EventoController extends BaseController
 
     public function excluirR4020(): void
     {
-        $this->requireLogin();
-        $id  = (int) ($this->post('id') ?? $this->get('id'));
-        $cid = (int) ($this->post('competencia_id') ?? $this->get('competencia_id'));
-        $this->getComp($cid);
-        $this->eventos->excluir('r4020', $id, $cid);
-        $this->redirect("/eventos/r4020?competencia_id={$cid}", 'Registro excluído.', 'sucesso');
+        $this->excluirEvento('r4020', '/eventos/r4020');
     }
 }

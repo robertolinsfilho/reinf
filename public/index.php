@@ -12,9 +12,17 @@ if (file_exists(BASE_PATH . '/.env')) {
     $dotenv->load();
 }
 
-session_start();
+ini_set('session.use_strict_mode', '1');
+ini_set('session.cookie_httponly', '1');
+ini_set('session.cookie_samesite', 'Lax');
 
 $config = \App\Models\AppConfig::get();
+
+if (($config['app']['env'] ?? '') === 'production') {
+    ini_set('session.cookie_secure', '1');
+}
+
+session_start();
 
 $uri    = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 $method = $_SERVER['REQUEST_METHOD'];
@@ -32,11 +40,9 @@ $routes = [
         '/contribuintes'         => ['App\\Controllers\\ContribuinteController', 'index'],
         '/contribuintes/novo'    => ['App\\Controllers\\ContribuinteController', 'novo'],
         '/contribuintes/editar'  => ['App\\Controllers\\ContribuinteController', 'editar'],
-        '/contribuintes/excluir' => ['App\\Controllers\\ContribuinteController', 'excluir'],
         '/processos'             => ['App\\Controllers\\ProcessoController', 'index'],
         '/processos/novo'        => ['App\\Controllers\\ProcessoController', 'novo'],
         '/processos/editar'      => ['App\\Controllers\\ProcessoController', 'editar'],
-        '/processos/excluir'     => ['App\\Controllers\\ProcessoController', 'excluir'],
         // Competências
         '/competencias'          => ['App\\Controllers\\CompetenciaController', 'index'],
         '/competencias/nova'     => ['App\\Controllers\\CompetenciaController', 'nova'],
@@ -73,8 +79,10 @@ $routes = [
     'POST' => [
         '/login'                    => ['App\\Controllers\\AuthController', 'login'],
         '/contribuintes/salvar'     => ['App\\Controllers\\ContribuinteController', 'salvar'],
+        '/contribuintes/excluir'    => ['App\\Controllers\\ContribuinteController', 'excluir'],
         '/competencias/salvar'      => ['App\\Controllers\\CompetenciaController', 'salvar'],
-        '/processos/salvar'      => ['App\\Controllers\\ProcessoController', 'salvar'],
+        '/processos/salvar'         => ['App\\Controllers\\ProcessoController', 'salvar'],
+        '/processos/excluir'        => ['App\\Controllers\\ProcessoController', 'excluir'],
 
         // Eventos R-2000
         '/eventos/r2010/salvar'     => ['App\\Controllers\\EventoController', 'salvarR2010'],
@@ -112,6 +120,9 @@ $handler = $routes[$method][$uri] ?? null;
 if ($handler) {
     [$class, $action] = $handler;
     $controller = new $class($config);
+    if ($method === 'POST') {
+        $controller->verifyCsrf();
+    }
     $controller->$action();
 } else {
     http_response_code(404);

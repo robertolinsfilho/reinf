@@ -90,7 +90,7 @@ class ContribuinteController extends BaseController
     {
         $this->requireLogin();
         $this->safeExecute(function () {
-            $this->repo->excluir((int) $this->get('id'), $this->userId());
+            $this->repo->excluir((int) $this->post('id'), $this->userId());
             $this->redirect('/contribuintes', 'Contribuinte excluído.', 'sucesso');
         }, '/contribuintes');
     }

@@ -163,7 +163,7 @@ class GeracaoController extends BaseController
     public function download(): void
     {
         $this->requireLogin();
-        $arquivo = $this->arquivos->find((int) $this->get('id'));
+        $arquivo = $this->arquivos->findForUser((int) $this->get('id'), $this->userId());
 
         if (!$arquivo) {
             http_response_code(404);
@@ -181,8 +181,9 @@ class GeracaoController extends BaseController
             return;
         }
 
+        $nome = basename((string) $arquivo['nome_arquivo']);
         header('Content-Type: application/xml; charset=utf-8');
-        header('Content-Disposition: attachment; filename="' . $arquivo['nome_arquivo'] . '"');
+        header('Content-Disposition: attachment; filename="' . $nome . '"');
         header('Content-Length: ' . strlen($conteudo));
         echo $conteudo;
     }

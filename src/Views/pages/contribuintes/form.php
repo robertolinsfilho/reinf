@@ -12,6 +12,7 @@
 <div class="card">
     <div class="card-body p-4">
         <form action="/contribuintes/salvar" method="POST" id="formContribuinte">
+    <?= $csrfField ?>
             <?php if ($contribuinte): ?>
             <input type="hidden" name="id" value="<?= $contribuinte['id'] ?>">
             <?php endif; ?>

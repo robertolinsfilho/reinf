@@ -12,6 +12,7 @@
 <div class="card" style="max-width:500px">
     <div class="card-body p-4">
         <form action="/competencias/salvar" method="POST">
+    <?= $csrfField ?>
             <div class="mb-3">
                 <label class="form-label">Contribuinte *</label>
                 <select name="contribuinte_id" class="form-select" required>

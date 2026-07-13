@@ -16,9 +16,9 @@ return [
         'charset' => 'utf8mb4',
     ],
     'upload' => [
-        'path'     => __DIR__ . '/../public/uploads/',
+        'path'     => __DIR__ . '/../storage/uploads/',
         'max_size' => 50 * 1024 * 1024,
-        'allowed'  => ['xlsx', 'xls'],
+        'allowed'  => ['xlsx', 'xls', 'xlsm'],
     ],
     'reinf' => [
         'tp_amb'     => (int) ($_ENV['REINF_TP_AMB'] ?? 2), // 1=Produção, 2=Homologação

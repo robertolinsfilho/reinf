@@ -9,6 +9,7 @@
 <div class="card" style="max-width:420px">
     <div class="card-body p-4">
         <form action="/perfil/salvar" method="POST">
+    <?= $csrfField ?>
             <div class="mb-3">
                 <label class="form-label">Nome *</label>
                 <input type="text" name="nome" class="form-control" value="<?= htmlspecialchars($usuario['nome']) ?>" required>

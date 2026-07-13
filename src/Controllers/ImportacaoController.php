@@ -52,7 +52,7 @@ class ImportacaoController extends BaseController
             $this->redirect('/importar', 'Arquivo deve ser .xlsx, .xlsm ou .xls.', 'erro');
         }
 
-        $uploadDir = $this->config['upload']['path'] ?? BASE_PATH . '/public/uploads/';
+        $uploadDir = $this->config['upload']['path'] ?? BASE_PATH . '/storage/uploads/';
         if (!is_dir($uploadDir)) {
             mkdir($uploadDir, 0755, true);
         }

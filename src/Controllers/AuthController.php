@@ -41,6 +41,7 @@ class AuthController extends BaseController
             'perfil' => $usuario['perfil'],
         ];
 
+        session_regenerate_id(true);
         $this->redirect('/dashboard');
     }
 

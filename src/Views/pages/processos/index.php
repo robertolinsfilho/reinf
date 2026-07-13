@@ -63,10 +63,14 @@
                         <a href="/processos/editar?id=<?= $p['id'] ?>" class="btn btn-outline-primary btn-sm py-0 px-2">
                             <i class="bi bi-pencil"></i>
                         </a>
-                        <a href="/processos/excluir?id=<?= $p['id'] ?>" class="btn btn-outline-danger btn-sm py-0 px-2"
-                           onclick="return confirm('Excluir este processo?')">
-                            <i class="bi bi-trash3"></i>
-                        </a>
+                        <form action="/processos/excluir" method="POST" class="d-inline"
+                              onsubmit="return confirm('Excluir este processo?')">
+                            <?= $csrfField ?>
+                            <input type="hidden" name="id" value="<?= (int) $p['id'] ?>">
+                            <button type="submit" class="btn btn-outline-danger btn-sm py-0 px-2" title="Excluir">
+                                <i class="bi bi-trash3"></i>
+                            </button>
+                        </form>
                     </td>
                 </tr>
                 <?php endforeach; endif; ?>

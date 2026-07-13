@@ -26,6 +26,7 @@
                 <?php else: ?>
 
                 <form action="/importar/processar" method="POST" enctype="multipart/form-data">
+    <?= $csrfField ?>
 
                     <div class="mb-3">
                         <label class="form-label fw-bold">Competência *</label>

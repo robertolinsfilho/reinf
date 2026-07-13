@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Models;
 
 class Database
@@ -20,8 +22,7 @@ class Database
         if (self::$instance === null) {
             $c = self::$cachedConfig;
             if (empty($c)) {
-                // Fallback: ler do config/app.php
-                $config = \App\Models\AppConfig::get();
+                $appConfig = AppConfig::get();
                 $c = $appConfig['db'];
                 self::$cachedConfig = $c;
             }
