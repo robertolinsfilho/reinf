@@ -258,19 +258,7 @@ class EventoController extends BaseController
         $cid = (int) $this->get('competencia_id');
         $p   = $this->paginacao($cid, 'r4020');
 
-        $stmt = $this->db->prepare("
-            SELECT codigo, descricao, grupo
-            FROM naturezas_rendimento
-            WHERE ativo = 1 AND tabela_origem = '4020'
-            ORDER BY grupo, codigo
-        ");
-        $stmt->execute();
-        $regs = $stmt->fetchAll();
-
-        $naturezas = [];
-        foreach ($regs as $r) {
-            $naturezas[$r['grupo']][] = ['codigo' => $r['codigo'], 'descricao' => $r['descricao']];
-        }
+        $naturezas = (new NaturezaRendimentoRepository($this->db))->agrupadoPorTipo('pj');
 
         $editId   = (int) $this->get('id');
         $editando = $editId ? $this->eventos->find('r4020', $editId, $cid) : null;
@@ -297,6 +285,8 @@ class EventoController extends BaseController
         $this->safeExecute(function () use ($cid) {
             $id             = (int) $this->post('id', 0);
             $codTipoServico = str_pad((string) $this->post('cod_tipo_servico', ''), 5, '0', STR_PAD_LEFT);
+            $indOrig        = $this->post('indicador_origem_recurso') ?: null;
+            $indFci         = $this->post('indicador_fci_scp') ?: null;
 
             $dados = [
                 'cnpj_contribuinte'         => $this->postCnpj('cnpj_contribuinte') ?: null,
@@ -310,15 +300,27 @@ class EventoController extends BaseController
                 'data_pagamento'            => $this->post('data_pagamento', date('Y-m-d')),
                 'valor_bruto'               => $this->postMoney('valor_bruto'),
                 'valor_base_ir'             => $this->postMoney('valor_base_ir'),
+                'valor_base_csll'           => $this->postMoney('valor_base_csll'),
+                'valor_base_cofins'         => $this->postMoney('valor_base_cofins'),
+                'valor_base_pis'            => $this->postMoney('valor_base_pis'),
+                'valor_base_agreg'          => $this->postMoney('valor_base_agreg'),
                 'valor_ir'                  => $this->postMoney('valor_ir'),
                 'vl_csrf_agregado'          => $this->postMoney('vl_csrf_agregado'),
                 'valor_csll'                => $this->postMoney('valor_csll'),
                 'valor_pis'                 => $this->postMoney('valor_pis'),
                 'valor_cofins'              => $this->postMoney('valor_cofins'),
                 'identificador_adicional'   => $this->sanitize($this->post('identificador_adicional', '')),
+                'indicador_fci_scp'         => $indFci !== null && $indFci !== '' ? (int) $indFci : null,
+                'cnpj_fci_scp'              => $this->postCnpj('cnpj_fci_scp') ?: null,
+                'percentual_scp'            => $this->post('percentual_scp') !== '' && $this->post('percentual_scp') !== null
+                    ? (float) str_replace(',', '.', (string) $this->post('percentual_scp'))
+                    : null,
                 'indicador_judicial'        => !empty($this->post('indicador_judicial')) ? 1 : 0,
                 'numero_processo'           => $this->sanitize($this->post('numero_processo', '')),
-                'indicador_origem_recurso'  => $this->post('indicador_origem_recurso') ?: null,
+                'indicador_origem_recurso'  => $indOrig,
+                'cnpj_origem_recurso'       => ((string) $indOrig === '2')
+                    ? ($this->postCnpj('cnpj_origem_recurso') ?: null)
+                    : null,
                 'observacoes'               => $this->sanitize($this->post('observacoes', '')),
             ];
 

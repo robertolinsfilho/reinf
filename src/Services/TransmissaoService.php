@@ -91,22 +91,50 @@ class TransmissaoService
         $sucesso = in_array($retorno['http_code'], [200, 201, 202], true);
 
         $recibos = [];
-        if (preg_match_all('/<nrRecibo>([^<]+)<\/nrRecibo>/', $retorno['body'], $m)) {
+        $recibosPorId = [];
+        $body = $retorno['body'] ?? '';
+
+        if (preg_match_all('/<nrRecibo>([^<]+)<\/nrRecibo>/', $body, $m)) {
             $recibos = $m[1];
         }
 
+        // Associa Id do evento ao recibo (retorno REINF)
+        if (preg_match_all(
+            '/(?:Id|id)=["\']?(ID[0-9A-Za-z]+)["\']?[\s\S]{0,800}?<nrRecibo>([^<]+)<\/nrRecibo>/',
+            $body,
+            $pares,
+            PREG_SET_ORDER
+        )) {
+            foreach ($pares as $par) {
+                $recibosPorId[$par[1]] = $par[2];
+            }
+        }
+
+        // Alternativa: bloco retornoEvento com ideStatus e nrRecibo próximo ao id do evento
+        if (empty($recibosPorId) && preg_match_all(
+            '/<(?:evento|retEventos)[^>]*\s(?:Id|id)=["\']?(ID[0-9A-Za-z]+)["\']?[^>]*>[\s\S]*?<nrRecibo>([^<]+)<\/nrRecibo>/',
+            $body,
+            $pares2,
+            PREG_SET_ORDER
+        )) {
+            foreach ($pares2 as $par) {
+                $recibosPorId[$par[1]] = $par[2];
+            }
+        }
+
         return [
-            'sucesso'        => $sucesso,
-            'http_code'      => $retorno['http_code'],
-            'xml_retorno'    => $retorno['body'],
-            'codigo_retorno' => $this->extrairTag($retorno['body'], 'cdResposta')
-                                ?: $this->extrairTag($retorno['body'], 'cdRetorno')
-                                ?: (string) $retorno['http_code'],
-            'desc_retorno'   => $this->extrairTag($retorno['body'], 'descResposta')
-                                ?: $this->extrairTag($retorno['body'], 'descRetorno')
-                                ?: $retorno['body'],
-            'recibos'        => $recibos,
-            'tempo_ms'       => $tempo,
+            'sucesso'         => $sucesso,
+            'http_code'       => $retorno['http_code'],
+            'xml_retorno'     => $body,
+            'codigo_retorno'  => $this->extrairTag($body, 'cdResposta')
+                                 ?: $this->extrairTag($body, 'cdRetorno')
+                                 ?: (string) $retorno['http_code'],
+            'desc_retorno'    => $this->extrairTag($body, 'descResposta')
+                                 ?: $this->extrairTag($body, 'descRetorno')
+                                 ?: $body,
+            'recibos'         => $recibos,
+            'recibos_por_id'  => $recibosPorId,
+            'tempo_ms'        => $tempo,
         ];
     }
 

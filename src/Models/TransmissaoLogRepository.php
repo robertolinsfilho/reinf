@@ -45,6 +45,7 @@ class TransmissaoLogRepository extends Repository
             'tipo_operacao'     => 'consulta',
             'evento'            => '',
             'protocolo'         => $protocolo,
+            'numero_recibo'     => ($resultado['recibos'][0] ?? null),
             'xml_retorno'       => $resultado['xml_retorno'] ?? '',
             'codigo_retorno'    => $resultado['codigo_retorno'] ?? '',
             'descricao_retorno' => $resultado['desc_retorno'] ?? '',

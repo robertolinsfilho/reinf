@@ -35,6 +35,7 @@ class GeracaoController extends BaseController
                 'competencias'       => $this->competencias->listByUser($this->userId()),
                 'eventosDisponiveis' => [],
                 'arquivosGerados'    => [],
+                'recibosR4020'       => [],
                 'certInfo'           => (new AssinaturaService($this->userId()))->infoCertificado(),
                 'flash'              => $this->getFlash(),
             ]);
@@ -57,6 +58,7 @@ class GeracaoController extends BaseController
             'competencias'       => [],
             'eventosDisponiveis' => $disponiveis,
             'arquivosGerados'    => $this->arquivos->listByCompetenciaForUser($compId, $this->userId()),
+            'recibosR4020'       => $this->arquivos->listRecibosR4020($compId),
             'certInfo'           => (new AssinaturaService($this->userId()))->infoCertificado(),
             'flash'              => $this->getFlash(),
         ]);
@@ -77,8 +79,11 @@ class GeracaoController extends BaseController
             $this->redirect($url, 'Selecione ao menos um evento.', 'erro');
         }
 
-        if ($indRetif === 2 && !$nrRecibo) {
-            $this->redirect($url, 'Retificação exige o número do recibo original.', 'erro');
+        $temR4020 = in_array('R4020', $selecionados, true);
+        $recibosSalvos = $temR4020 ? $this->arquivos->listRecibosR4020($compId) : [];
+
+        if ($indRetif === 2 && !$nrRecibo && empty($recibosSalvos)) {
+            $this->redirect($url, 'Retificação exige o número do recibo original (informe ou consulte o protocolo antes).', 'erro');
         }
 
         $comp = $this->competencias->findWithContribuinte($compId, $this->userId());

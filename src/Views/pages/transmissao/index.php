@@ -53,7 +53,7 @@ $certOk = !empty($certInfo['valido']);
                     <thead>
                         <tr>
                             <th style="width:30px"><input type="checkbox" onclick="document.querySelectorAll('.chk-arq').forEach(c=>c.checked=this.checked)"></th>
-                            <th>Evento</th><th>Arquivo</th><th>Tamanho</th>
+                            <th>Evento</th><th>Arquivo</th><th>Recibo</th><th>Tamanho</th>
                             <th>Assinado</th><th>Gerado em</th>
                         </tr>
                     </thead>
@@ -63,6 +63,11 @@ $certOk = !empty($certInfo['valido']);
                             <td><input type="checkbox" name="arquivos[]" value="<?= $a['id'] ?>" class="chk-arq" checked></td>
                             <td><span class="badge bg-primary"><?= $a['evento'] ?? '—' ?></span></td>
                             <td class="font-monospace small"><?= htmlspecialchars($a['nome_arquivo']) ?></td>
+                            <td class="font-monospace small">
+                                <?= !empty($a['nr_recibo_retornado'])
+                                    ? htmlspecialchars($a['nr_recibo_retornado'])
+                                    : '<span class="text-muted">—</span>' ?>
+                            </td>
                             <td class="small text-muted"><?= number_format(($a['tamanho'] ?? 0) / 1024, 1) ?> KB</td>
                             <td><?= !empty($a['assinado']) ? '<i class="bi bi-check-circle-fill text-success"></i> Sim' : '<i class="bi bi-x-circle text-muted"></i> Não' ?></td>
                             <td class="small text-muted"><?= date('d/m/Y H:i', strtotime($a['created_at'])) ?></td>

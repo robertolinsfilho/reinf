@@ -120,8 +120,8 @@ class GeracaoXmlService
 
     private function fmtVal(float|string|null $valor): string
     {
-        // XSD EFD-Reinf: separador decimal é ponto (ex: 1234.56)
-        return number_format((float) ($valor ?? 0), 2, '.', '');
+        // XSD EFD-Reinf (TS_valorMonetario): separador decimal é vírgula (ex: 1234,56)
+        return number_format((float) ($valor ?? 0), 2, ',', '');
     }
 
     // ═══ R-1000 ═══════════════════════════════════════
@@ -212,9 +212,9 @@ class GeracaoXmlService
             $totRet   = array_sum(array_column($nfs, 'valor_retencao'));
             $nfsXml = '';
             foreach ($nfs as $n) {
-                $nfsXml .= "                    <nfs><serie>" . ($n['serie'] ?? '1') . "</serie><numDocto>" . ($n['num_documento'] ?: '1') . "</numDocto><dtEmissaoNF>" . ($n['data_emissao'] ?: date('Y-m-d')) . "</dtEmissaoNF><vlrBruto>" . $this->fmtVal($n['valor_bruto']) . "</vlrBruto><vlrBaseRet>" . $this->fmtVal($n['valor_bruto']) . "</vlrBaseRet><vlrRetencao>" . $this->fmtVal($n['valor_retencao']) . "</vlrRetencao><vlrRetSub>0.00</vlrRetSub><vlrNRetPrinc>0.00</vlrNRetPrinc><vlrServicos15>" . $this->fmtVal($n['valor_bruto']) . "</vlrServicos15><vlrServicos20>0.00</vlrServicos20><vlrServicos25>0.00</vlrServicos25><vlrAdicional>0.00</vlrAdicional><vlrNRetAdwordc>0.00</vlrNRetAdwordc></nfs>\n";
+                $nfsXml .= "                    <nfs><serie>" . ($n['serie'] ?? '1') . "</serie><numDocto>" . ($n['num_documento'] ?: '1') . "</numDocto><dtEmissaoNF>" . ($n['data_emissao'] ?: date('Y-m-d')) . "</dtEmissaoNF><vlrBruto>" . $this->fmtVal($n['valor_bruto']) . "</vlrBruto><vlrBaseRet>" . $this->fmtVal($n['valor_bruto']) . "</vlrBaseRet><vlrRetencao>" . $this->fmtVal($n['valor_retencao']) . "</vlrRetencao><vlrRetSub>" . $this->fmtVal(0) . "</vlrRetSub><vlrNRetPrinc>" . $this->fmtVal(0) . "</vlrNRetPrinc><vlrServicos15>" . $this->fmtVal($n['valor_bruto']) . "</vlrServicos15><vlrServicos20>" . $this->fmtVal(0) . "</vlrServicos20><vlrServicos25>" . $this->fmtVal(0) . "</vlrServicos25><vlrAdicional>" . $this->fmtVal(0) . "</vlrAdicional><vlrNRetAdwordc>" . $this->fmtVal(0) . "</vlrNRetAdwordc></nfs>\n";
             }
-            $xml .= "                <idePrestServ><cnpjPrestador>{$cnpjP}</cnpjPrestador><vlrTotalBruto>" . $this->fmtVal($totBruto) . "</vlrTotalBruto><vlrTotalBaseRet>" . $this->fmtVal($totBruto) . "</vlrTotalBaseRet><vlrTotalRetPrinc>" . $this->fmtVal($totRet) . "</vlrTotalRetPrinc><vlrTotalRetAdic>0.00</vlrTotalRetAdic><vlrTotalNRetPrinc>0.00</vlrTotalNRetPrinc><vlrTotalNRetAdic>0.00</vlrTotalNRetAdic>\n{$nfsXml}                </idePrestServ>\n";
+            $xml .= "                <idePrestServ><cnpjPrestador>{$cnpjP}</cnpjPrestador><vlrTotalBruto>" . $this->fmtVal($totBruto) . "</vlrTotalBruto><vlrTotalBaseRet>" . $this->fmtVal($totBruto) . "</vlrTotalBaseRet><vlrTotalRetPrinc>" . $this->fmtVal($totRet) . "</vlrTotalRetPrinc><vlrTotalRetAdic>" . $this->fmtVal(0) . "</vlrTotalRetAdic><vlrTotalNRetPrinc>" . $this->fmtVal(0) . "</vlrTotalNRetPrinc><vlrTotalNRetAdic>" . $this->fmtVal(0) . "</vlrTotalNRetAdic>\n{$nfsXml}                </idePrestServ>\n";
         }
 
         $body = "        {$this->ideEvento($comp['periodo'], $this->indRetif, $this->nrRecibo)}\n"
@@ -245,9 +245,9 @@ class GeracaoXmlService
             $totRet   = array_sum(array_column($nfs, 'valor_retencao'));
             $nfsXml = '';
             foreach ($nfs as $n) {
-                $nfsXml .= "                    <nfs><serie>" . ($n['serie'] ?? '1') . "</serie><numDocto>" . ($n['num_documento'] ?: '1') . "</numDocto><dtEmissaoNF>" . ($n['data_emissao'] ?: date('Y-m-d')) . "</dtEmissaoNF><vlrBruto>" . $this->fmtVal($n['valor_bruto']) . "</vlrBruto><vlrBaseRet>" . $this->fmtVal($n['valor_bruto']) . "</vlrBaseRet><vlrRetencao>" . $this->fmtVal($n['valor_retencao']) . "</vlrRetencao><vlrRetSub>0.00</vlrRetSub><vlrNRetPrinc>0.00</vlrNRetPrinc><vlrServicos15>" . $this->fmtVal($n['valor_bruto']) . "</vlrServicos15><vlrServicos20>0.00</vlrServicos20><vlrServicos25>0.00</vlrServicos25><vlrAdicional>0.00</vlrAdicional><vlrNRetAdwordc>0.00</vlrNRetAdwordc></nfs>\n";
+                $nfsXml .= "                    <nfs><serie>" . ($n['serie'] ?? '1') . "</serie><numDocto>" . ($n['num_documento'] ?: '1') . "</numDocto><dtEmissaoNF>" . ($n['data_emissao'] ?: date('Y-m-d')) . "</dtEmissaoNF><vlrBruto>" . $this->fmtVal($n['valor_bruto']) . "</vlrBruto><vlrBaseRet>" . $this->fmtVal($n['valor_bruto']) . "</vlrBaseRet><vlrRetencao>" . $this->fmtVal($n['valor_retencao']) . "</vlrRetencao><vlrRetSub>" . $this->fmtVal(0) . "</vlrRetSub><vlrNRetPrinc>" . $this->fmtVal(0) . "</vlrNRetPrinc><vlrServicos15>" . $this->fmtVal($n['valor_bruto']) . "</vlrServicos15><vlrServicos20>" . $this->fmtVal(0) . "</vlrServicos20><vlrServicos25>" . $this->fmtVal(0) . "</vlrServicos25><vlrAdicional>" . $this->fmtVal(0) . "</vlrAdicional><vlrNRetAdwordc>" . $this->fmtVal(0) . "</vlrNRetAdwordc></nfs>\n";
             }
-            $xml .= "                <ideTomador><tpInscTomador>1</tpInscTomador><nrInscTomador>{$cnpjT}</nrInscTomador><vlrTotalBruto>" . $this->fmtVal($totBruto) . "</vlrTotalBruto><vlrTotalBaseRet>" . $this->fmtVal($totBruto) . "</vlrTotalBaseRet><vlrTotalRetPrinc>" . $this->fmtVal($totRet) . "</vlrTotalRetPrinc><vlrTotalRetAdic>0.00</vlrTotalRetAdic><vlrTotalNRetPrinc>0.00</vlrTotalNRetPrinc><vlrTotalNRetAdic>0.00</vlrTotalNRetAdic>\n{$nfsXml}                </ideTomador>\n";
+            $xml .= "                <ideTomador><tpInscTomador>1</tpInscTomador><nrInscTomador>{$cnpjT}</nrInscTomador><vlrTotalBruto>" . $this->fmtVal($totBruto) . "</vlrTotalBruto><vlrTotalBaseRet>" . $this->fmtVal($totBruto) . "</vlrTotalBaseRet><vlrTotalRetPrinc>" . $this->fmtVal($totRet) . "</vlrTotalRetPrinc><vlrTotalRetAdic>" . $this->fmtVal(0) . "</vlrTotalRetAdic><vlrTotalNRetPrinc>" . $this->fmtVal(0) . "</vlrTotalNRetPrinc><vlrTotalNRetAdic>" . $this->fmtVal(0) . "</vlrTotalNRetAdic>\n{$nfsXml}                </ideTomador>\n";
         }
 
         $body = "        {$this->ideEvento($comp['periodo'], $this->indRetif, $this->nrRecibo)}\n"
@@ -273,7 +273,7 @@ class GeracaoXmlService
         foreach ($registros as $r) {
             $bc = (float)$r['valor_rec_bruta'] - (float)$r['valor_exclusoes'];
             $cprb = $bc * ((float)$r['aliquota'] / 100);
-            $xml .= "                <tipoCod><codAtivEcon>" . htmlspecialchars($r['cnae']) . "</codAtivEcon><vlrRecBrutaAtiv>" . $this->fmtVal($r['valor_rec_bruta']) . "</vlrRecBrutaAtiv><vlrExcRecBruta>" . $this->fmtVal($r['valor_exclusoes']) . "</vlrExcRecBruta><vlrAdicRecBruta>0.00</vlrAdicRecBruta><vlrBcCPRB>" . $this->fmtVal($bc) . "</vlrBcCPRB><vlrCPRBapur>" . $this->fmtVal($cprb) . "</vlrCPRBapur></tipoCod>\n";
+            $xml .= "                <tipoCod><codAtivEcon>" . htmlspecialchars($r['cnae']) . "</codAtivEcon><vlrRecBrutaAtiv>" . $this->fmtVal($r['valor_rec_bruta']) . "</vlrRecBrutaAtiv><vlrExcRecBruta>" . $this->fmtVal($r['valor_exclusoes']) . "</vlrExcRecBruta><vlrAdicRecBruta>" . $this->fmtVal(0) . "</vlrAdicRecBruta><vlrBcCPRB>" . $this->fmtVal($bc) . "</vlrBcCPRB><vlrCPRBapur>" . $this->fmtVal($cprb) . "</vlrCPRBapur></tipoCod>\n";
         }
 
         $body = "        {$this->ideEvento($comp['periodo'], $this->indRetif, $this->nrRecibo)}\n"
@@ -340,6 +340,9 @@ class GeracaoXmlService
         $registros = $stmt->fetchAll();
         if (empty($registros)) return [];
 
+        // Recibos anteriores por beneficiário (retificação)
+        $recibosPorChave = $this->mapRecibosR4020((int) $comp['id']);
+
         // Agrupa por CNPJ beneficiário + identificador adicional (ideEvtAdic)
         $porBenef = [];
         foreach ($registros as $r) {
@@ -353,6 +356,11 @@ class GeracaoXmlService
             [$cnpjBenef, $ideAdic] = array_pad(explode('|', $chave, 2), 2, '');
             $nome = $pagtosBenef[0]['razao_social_beneficiario'] ?? '';
             $id = $this->gerarId($cnpj);
+
+            $reciboEvt = $this->nrRecibo;
+            if ($this->indRetif === 2 && isset($recibosPorChave[$chave])) {
+                $reciboEvt = $recibosPorChave[$chave];
+            }
 
             // Agrupa por natureza dentro deste beneficiário
             $porNat = [];
@@ -372,6 +380,10 @@ class GeracaoXmlService
                     $vCofins = (float) ($p['valor_cofins'] ?? 0);
                     $vPIS    = (float) ($p['valor_pis'] ?? 0);
                     $vAgreg  = (float) ($p['vl_csrf_agregado'] ?? 0);
+                    $vBaseCSLL   = (float) ($p['valor_base_csll'] ?? 0) ?: $vBruto;
+                    $vBaseCofins = (float) ($p['valor_base_cofins'] ?? 0) ?: $vBruto;
+                    $vBasePIS    = (float) ($p['valor_base_pis'] ?? 0) ?: $vBruto;
+                    $vBaseAgreg  = (float) ($p['valor_base_agreg'] ?? 0) ?: $vBruto;
                     $indJud  = !empty($p['indicador_judicial']) ? 'S' : 'N';
                     $codPais = preg_replace('/\D/', '', (string) ($p['cod_pais'] ?? ''));
                     // 105 = Brasil — não informar paisResidExt
@@ -381,8 +393,21 @@ class GeracaoXmlService
 
                     $infoPgtoXml .= '<infoPgto>'
                                   . '<dtFG>' . ($p['data_pagamento'] ?? '') . '</dtFG>'
-                                  . '<vlrBruto>' . $this->fmtVal($vBruto) . '</vlrBruto>'
-                                  . "<indJud>{$indJud}</indJud>";
+                                  . '<vlrBruto>' . $this->fmtVal($vBruto) . '</vlrBruto>';
+
+                    $indFci = (string) ($p['indicador_fci_scp'] ?? '');
+                    if (in_array($indFci, ['1', '2'], true)) {
+                        $cnpjFci = preg_replace('/\D/', '', (string) ($p['cnpj_fci_scp'] ?? ''));
+                        $infoPgtoXml .= "<indFciScp>{$indFci}</indFciScp>";
+                        if ($cnpjFci !== '') {
+                            $infoPgtoXml .= '<nrInscFciScp>' . $cnpjFci . '</nrInscFciScp>';
+                        }
+                        if ($indFci === '2' && isset($p['percentual_scp']) && $p['percentual_scp'] !== null && $p['percentual_scp'] !== '') {
+                            $infoPgtoXml .= '<percSCP>' . $this->fmtVal($p['percentual_scp']) . '</percSCP>';
+                        }
+                    }
+
+                    $infoPgtoXml .= "<indJud>{$indJud}</indJud>";
 
                     if ($codPais !== '') {
                         $infoPgtoXml .= '<paisResidExt>' . htmlspecialchars($codPais) . '</paisResidExt>';
@@ -399,19 +424,19 @@ class GeracaoXmlService
                                           . '<vlrIR>' . $this->fmtVal($vIR) . '</vlrIR>';
                         }
                         if ($vAgreg > 0) {
-                            $infoPgtoXml .= '<vlrBaseAgreg>' . $this->fmtVal($vBruto) . '</vlrBaseAgreg>'
+                            $infoPgtoXml .= '<vlrBaseAgreg>' . $this->fmtVal($vBaseAgreg) . '</vlrBaseAgreg>'
                                           . '<vlrAgreg>' . $this->fmtVal($vAgreg) . '</vlrAgreg>';
                         }
                         if ($vCSLL > 0) {
-                            $infoPgtoXml .= '<vlrBaseCSLL>' . $this->fmtVal($vBruto) . '</vlrBaseCSLL>'
+                            $infoPgtoXml .= '<vlrBaseCSLL>' . $this->fmtVal($vBaseCSLL) . '</vlrBaseCSLL>'
                                           . '<vlrCSLL>' . $this->fmtVal($vCSLL) . '</vlrCSLL>';
                         }
                         if ($vCofins > 0) {
-                            $infoPgtoXml .= '<vlrBaseCofins>' . $this->fmtVal($vBruto) . '</vlrBaseCofins>'
+                            $infoPgtoXml .= '<vlrBaseCofins>' . $this->fmtVal($vBaseCofins) . '</vlrBaseCofins>'
                                           . '<vlrCofins>' . $this->fmtVal($vCofins) . '</vlrCofins>';
                         }
                         if ($vPIS > 0) {
-                            $infoPgtoXml .= '<vlrBasePP>' . $this->fmtVal($vBruto) . '</vlrBasePP>'
+                            $infoPgtoXml .= '<vlrBasePP>' . $this->fmtVal($vBasePIS) . '</vlrBasePP>'
                                           . '<vlrPP>' . $this->fmtVal($vPIS) . '</vlrPP>';
                         }
                         $infoPgtoXml .= '</retencoes>';
@@ -426,8 +451,14 @@ class GeracaoXmlService
                         }
                         $infoPgtoXml .= '<infoProcJud>'
                                       . '<nrProc>' . htmlspecialchars($nrProc) . '</nrProc>'
-                                      . "<indOrigRec>{$indOrig}</indOrigRec>"
-                                      . '</infoProcJud>';
+                                      . "<indOrigRec>{$indOrig}</indOrigRec>";
+                        if ($indOrig === '2') {
+                            $cnpjOrig = preg_replace('/\D/', '', (string) ($p['cnpj_origem_recurso'] ?? ''));
+                            if ($cnpjOrig !== '') {
+                                $infoPgtoXml .= '<cnpjOrigRecurso>' . $cnpjOrig . '</cnpjOrigRecurso>';
+                            }
+                        }
+                        $infoPgtoXml .= '</infoProcJud>';
                     }
 
                     $infoPgtoXml .= '</infoPgto>';
@@ -446,7 +477,7 @@ class GeracaoXmlService
 
             $cnpjEstab = preg_replace('/\D/', '', $pagtosBenef[0]['cnpj_contribuinte'] ?? $cnpj) ?: $cnpj;
 
-            $body = "        {$this->ideEvento($comp['periodo'], $this->indRetif, $this->nrRecibo)}\n"
+            $body = "        {$this->ideEvento($comp['periodo'], $this->indRetif, $reciboEvt)}\n"
                   . "        {$this->ideContri($cnpj)}\n"
                   . "        <ideEstab><tpInscEstab>1</tpInscEstab><nrInscEstab>{$cnpjEstab}</nrInscEstab>{$benefXml}</ideEstab>";
 
@@ -454,6 +485,39 @@ class GeracaoXmlService
         }
 
         return $xmls;
+    }
+
+    /**
+     * Mapa chave (cnpjBenef|ideEvtAdic) => nr_recibo_retornado dos XMLs R-4020 já consultados.
+     */
+    private function mapRecibosR4020(int $competenciaId): array
+    {
+        $stmt = $this->db->prepare("
+            SELECT nr_recibo_retornado, xml_conteudo
+            FROM arquivos_gerados
+            WHERE competencia_id = ?
+              AND evento = 'R4020'
+              AND nr_recibo_retornado IS NOT NULL
+              AND nr_recibo_retornado <> ''
+            ORDER BY id DESC
+        ");
+        $stmt->execute([$competenciaId]);
+        $map = [];
+        foreach ($stmt->fetchAll() as $row) {
+            $xml = (string) ($row['xml_conteudo'] ?? '');
+            if ($xml === '' || !preg_match('/<cnpjBenef>(\d+)<\/cnpjBenef>/', $xml, $mBenef)) {
+                continue;
+            }
+            $ideAdic = '';
+            if (preg_match('/<ideEvtAdic>([^<]*)<\/ideEvtAdic>/', $xml, $mAdic)) {
+                $ideAdic = trim($mAdic[1]);
+            }
+            $chave = $mBenef[1] . '|' . $ideAdic;
+            if (!isset($map[$chave])) {
+                $map[$chave] = $row['nr_recibo_retornado'];
+            }
+        }
+        return $map;
     }
    
     // ═══ R-4099 ═══════════════════════════════════════

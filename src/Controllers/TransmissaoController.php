@@ -98,7 +98,26 @@ class TransmissaoController extends BaseController
         }
 
         if ($resultado['sucesso']) {
-            $this->competencias->marcarTransmitido($compId, $resultado['protocolo'] ?? '');
+            $protocolo = $resultado['protocolo'] ?? '';
+            $this->competencias->marcarTransmitido($compId, $protocolo);
+            $this->arquivos->marcarProtocolo(array_map(fn($a) => (int) $a['id'], $arquivos), $protocolo);
+
+            // Simulação: gera recibo por arquivo imediatamente
+            if (!empty($resultado['simulado'])) {
+                $porId = [];
+                $ordem = [];
+                foreach ($arquivos as $i => $arq) {
+                    $recibo = 'SIM-REC-' . date('YmdHis') . '-' . sprintf('%03d', $i);
+                    $ordem[] = $recibo;
+                    if (!empty($arq['id_evento'])) {
+                        $porId[$arq['id_evento']] = $recibo;
+                    } elseif (!empty($arq['xml_conteudo']) && preg_match('/\bid="(ID[^"]+)"/', $arq['xml_conteudo'], $m)) {
+                        $porId[$m[1]] = $recibo;
+                        $this->arquivos->update((int) $arq['id'], ['id_evento' => $m[1]]);
+                    }
+                }
+                $this->arquivos->aplicarRecibos($compId, $protocolo, $porId, $ordem);
+            }
         }
 
         $sim = !empty($resultado['simulado']) ? ' (simulação)' : '';
@@ -127,6 +146,21 @@ class TransmissaoController extends BaseController
 
         $this->logs->registrarConsulta($compId, $uid, $protocolo, $resultado, $this->config['reinf']['tp_amb'] ?? 2);
 
-        $this->redirect($url, 'Retorno: ' . ($resultado['desc_retorno'] ?? '—'), $resultado['sucesso'] ? 'sucesso' : 'erro');
+        $qtdRecibos = 0;
+        if ($resultado['sucesso']) {
+            $qtdRecibos = $this->arquivos->aplicarRecibos(
+                $compId,
+                $protocolo,
+                $resultado['recibos_por_id'] ?? [],
+                $resultado['recibos'] ?? []
+            );
+        }
+
+        $extra = $qtdRecibos > 0 ? " | {$qtdRecibos} recibo(s) vinculado(s) aos XMLs." : '';
+        $this->redirect(
+            $url,
+            'Retorno: ' . ($resultado['desc_retorno'] ?? '—') . $extra,
+            $resultado['sucesso'] ? 'sucesso' : 'erro'
+        );
     }
 }

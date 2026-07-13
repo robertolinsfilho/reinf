@@ -75,7 +75,7 @@ $fmtMoney = static fn($v) => $v !== null && $v !== '' ? number_format((float) $v
 
                     <div class="row g-2 mb-2">
                         <div class="col-8">
-                            <label class="form-label small">Cód. Tipo Serviço (Tabela 4020) *</label>
+                            <label class="form-label small">Natureza do Rendimento (Tabela 01) *</label>
                             <?php $codSel = $e['cod_tipo_servico'] ?? $e['natureza_rendimento'] ?? ''; ?>
                             <select name="cod_tipo_servico" class="form-select form-select-sm" required>
                                 <option value="">Selecione...</option>
@@ -104,7 +104,7 @@ $fmtMoney = static fn($v) => $v !== null && $v !== '' ? number_format((float) $v
                                    value="<?= $fmtMoney($e['valor_bruto'] ?? null) ?>">
                         </div>
                         <div class="col-6">
-                            <label class="form-label small">Base Cálculo</label>
+                            <label class="form-label small">Base IR</label>
                             <input type="text" name="valor_base_ir" class="form-control form-control-sm text-end" placeholder="0,00"
                                    value="<?= $fmtMoney($e['valor_base_ir'] ?? null) ?>">
                         </div>
@@ -124,15 +124,39 @@ $fmtMoney = static fn($v) => $v !== null && $v !== '' ? number_format((float) $v
                     </div>
                     <div class="row g-2 mb-2">
                         <div class="col-4">
+                            <label class="form-label small">Base Agregado</label>
+                            <input type="text" name="valor_base_agreg" class="form-control form-control-sm text-end" placeholder="0,00"
+                                   value="<?= $fmtMoney($e['valor_base_agreg'] ?? null) ?>">
+                        </div>
+                        <div class="col-4">
+                            <label class="form-label small">Base CSLL</label>
+                            <input type="text" name="valor_base_csll" class="form-control form-control-sm text-end" placeholder="0,00"
+                                   value="<?= $fmtMoney($e['valor_base_csll'] ?? null) ?>">
+                        </div>
+                        <div class="col-4">
                             <label class="form-label small">CSLL</label>
                             <input type="text" name="valor_csll" class="form-control form-control-sm text-end" placeholder="0,00"
                                    value="<?= $fmtMoney($e['valor_csll'] ?? null) ?>">
+                        </div>
+                    </div>
+                    <div class="row g-2 mb-2">
+                        <div class="col-4">
+                            <label class="form-label small">Base PIS</label>
+                            <input type="text" name="valor_base_pis" class="form-control form-control-sm text-end" placeholder="0,00"
+                                   value="<?= $fmtMoney($e['valor_base_pis'] ?? null) ?>">
                         </div>
                         <div class="col-4">
                             <label class="form-label small">PIS</label>
                             <input type="text" name="valor_pis" class="form-control form-control-sm text-end" placeholder="0,00"
                                    value="<?= $fmtMoney($e['valor_pis'] ?? null) ?>">
                         </div>
+                        <div class="col-4">
+                            <label class="form-label small">Base COFINS</label>
+                            <input type="text" name="valor_base_cofins" class="form-control form-control-sm text-end" placeholder="0,00"
+                                   value="<?= $fmtMoney($e['valor_base_cofins'] ?? null) ?>">
+                        </div>
+                    </div>
+                    <div class="row g-2 mb-2">
                         <div class="col-4">
                             <label class="form-label small">COFINS</label>
                             <input type="text" name="valor_cofins" class="form-control form-control-sm text-end" placeholder="0,00"
@@ -144,6 +168,30 @@ $fmtMoney = static fn($v) => $v !== null && $v !== '' ? number_format((float) $v
                         <label class="form-label small">Identificador Adicional (ideEvtAdic)</label>
                         <input type="text" name="identificador_adicional" class="form-control form-control-sm" maxlength="8" placeholder="Até 8 caracteres"
                                value="<?= htmlspecialchars($e['identificador_adicional'] ?? '') ?>">
+                    </div>
+
+                    <div class="row g-2 mb-2">
+                        <div class="col-4">
+                            <label class="form-label small">FCI / SCP</label>
+                            <select name="indicador_fci_scp" id="ind-fci" class="form-select form-select-sm"
+                                    onchange="document.getElementById('bloco-fci').style.display=this.value?'flex':'none'">
+                                <option value="">— Não se aplica —</option>
+                                <option value="1" <?= (string) ($e['indicador_fci_scp'] ?? '') === '1' ? 'selected' : '' ?>>1 – FCI</option>
+                                <option value="2" <?= (string) ($e['indicador_fci_scp'] ?? '') === '2' ? 'selected' : '' ?>>2 – SCP</option>
+                            </select>
+                        </div>
+                        <div id="bloco-fci" class="col-8 row g-2" style="display:<?= !empty($e['indicador_fci_scp']) ? 'flex' : 'none' ?>">
+                            <div class="col-7">
+                                <label class="form-label small">CNPJ FCI/SCP</label>
+                                <input type="text" name="cnpj_fci_scp" class="form-control form-control-sm font-monospace" data-mask="cnpj"
+                                       value="<?= htmlspecialchars($e['cnpj_fci_scp'] ?? '') ?>">
+                            </div>
+                            <div class="col-5">
+                                <label class="form-label small">% SCP</label>
+                                <input type="text" name="percentual_scp" class="form-control form-control-sm text-end" placeholder="0,00"
+                                       value="<?= htmlspecialchars($e['percentual_scp'] ?? '') ?>">
+                            </div>
+                        </div>
                     </div>
 
                     <div class="row g-2 mb-2">
@@ -161,12 +209,19 @@ $fmtMoney = static fn($v) => $v !== null && $v !== '' ? number_format((float) $v
                         </div>
                         <div class="col-4">
                             <label class="form-label small">Origem recurso</label>
-                            <select name="indicador_origem_recurso" class="form-select form-select-sm">
+                            <select name="indicador_origem_recurso" id="ind-orig" class="form-select form-select-sm"
+                                    onchange="document.getElementById('bloco-cnpj-orig').style.display=this.value==='2'?'block':'none'">
                                 <option value="">—</option>
                                 <option value="1" <?= (string) ($e['indicador_origem_recurso'] ?? '') === '1' ? 'selected' : '' ?>>1 – Próprio</option>
                                 <option value="2" <?= (string) ($e['indicador_origem_recurso'] ?? '') === '2' ? 'selected' : '' ?>>2 – Terceiros</option>
                             </select>
                         </div>
+                    </div>
+                    <div id="bloco-cnpj-orig" class="mb-2" style="display:<?= (string) ($e['indicador_origem_recurso'] ?? '') === '2' ? 'block' : 'none' ?>">
+                        <label class="form-label small">CNPJ Origem do Recurso *</label>
+                        <input type="text" name="cnpj_origem_recurso" class="form-control form-control-sm font-monospace" data-mask="cnpj"
+                               value="<?= htmlspecialchars($e['cnpj_origem_recurso'] ?? '') ?>"
+                               placeholder="Obrigatório se origem = terceiros">
                     </div>
 
                     <div class="mb-3">

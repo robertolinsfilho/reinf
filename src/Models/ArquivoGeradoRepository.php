@@ -66,10 +66,16 @@ class ArquivoGeradoRepository extends Repository
 
     public function salvar(int $competenciaId, int $userId, array $arq, bool $assinado, int $indRetif = 1, ?string $nrRecibo = null): int
     {
+        $idEvento = null;
+        if (!empty($arq['xml']) && preg_match('/\bid="(ID[^"]+)"/', (string) $arq['xml'], $m)) {
+            $idEvento = $m[1];
+        }
+
         return $this->insert([
             'competencia_id'      => $competenciaId,
             'usuario_id'          => $userId,
             'evento'              => $arq['evento'],
+            'id_evento'           => $idEvento,
             'nome_arquivo'        => $arq['nome'],
             'caminho'             => $arq['caminho'],
             'tamanho'             => $arq['tamanho'],
@@ -79,5 +85,70 @@ class ArquivoGeradoRepository extends Repository
             'ind_retif'           => $indRetif,
             'nr_recibo_original'  => $nrRecibo,
         ]);
+    }
+
+    public function marcarProtocolo(array $ids, string $protocolo): void
+    {
+        if (empty($ids) || $protocolo === '') {
+            return;
+        }
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+        $stmt = $this->db->prepare(
+            "UPDATE arquivos_gerados SET protocolo = ? WHERE id IN ({$placeholders})"
+        );
+        $stmt->execute([$protocolo, ...array_map('intval', $ids)]);
+    }
+
+    /**
+     * Atualiza nr_recibo_retornado a partir do mapa id_evento => recibo.
+     * Fallback: aplica recibos em ordem aos arquivos do protocolo sem id.
+     */
+    public function aplicarRecibos(int $competenciaId, string $protocolo, array $recibosPorIdEvento, array $recibosOrdem = []): int
+    {
+        $atualizados = 0;
+
+        foreach ($recibosPorIdEvento as $idEvento => $recibo) {
+            $stmt = $this->db->prepare("
+                UPDATE arquivos_gerados
+                SET nr_recibo_retornado = ?
+                WHERE competencia_id = ?
+                  AND id_evento = ?
+                  AND (protocolo = ? OR protocolo IS NULL OR protocolo = '')
+            ");
+            $stmt->execute([$recibo, $competenciaId, $idEvento, $protocolo]);
+            $atualizados += $stmt->rowCount();
+        }
+
+        if ($atualizados === 0 && !empty($recibosOrdem)) {
+            $arquivos = $this->query(
+                "SELECT id FROM arquivos_gerados
+                 WHERE competencia_id = ? AND protocolo = ?
+                 ORDER BY id ASC",
+                [$competenciaId, $protocolo]
+            );
+            foreach ($arquivos as $i => $arq) {
+                if (!isset($recibosOrdem[$i])) {
+                    break;
+                }
+                $this->update((int) $arq['id'], ['nr_recibo_retornado' => $recibosOrdem[$i]]);
+                $atualizados++;
+            }
+        }
+
+        return $atualizados;
+    }
+
+    public function listRecibosR4020(int $competenciaId): array
+    {
+        return $this->query(
+            "SELECT id, nome_arquivo, id_evento, nr_recibo_retornado, protocolo, created_at, xml_conteudo
+             FROM arquivos_gerados
+             WHERE competencia_id = ?
+               AND evento = 'R4020'
+               AND nr_recibo_retornado IS NOT NULL
+               AND nr_recibo_retornado <> ''
+             ORDER BY created_at DESC",
+            [$competenciaId]
+        );
     }
 }

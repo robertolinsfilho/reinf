@@ -121,9 +121,32 @@
                             </label>
                         </div>
                         <div id="campo-recibo" style="display:none" class="mt-2">
-                            <label class="form-label small mb-1">Número do Recibo Original *</label>
-                            <input type="text" name="nr_recibo_original" class="form-control form-control-sm font-monospace" placeholder="Recibo da transmissão original">
-                            <div class="form-text">Informe o recibo retornado pela Receita Federal na transmissão original.</div>
+                            <label class="form-label small mb-1">Número do Recibo Original</label>
+                            <?php $recibosR4020 = $recibosR4020 ?? []; ?>
+                            <?php if (!empty($recibosR4020)): ?>
+                            <select class="form-select form-select-sm font-monospace mb-2"
+                                    onchange="document.getElementById('nr-recibo-input').value=this.value">
+                                <option value="">Usar recibo salvo por beneficiário (R-4020)</option>
+                                <?php foreach ($recibosR4020 as $r): ?>
+                                <?php
+                                    $cnpjBenef = '';
+                                    if (!empty($r['xml_conteudo']) && preg_match('/<cnpjBenef>(\d+)<\/cnpjBenef>/', $r['xml_conteudo'], $mb)) {
+                                        $cnpjBenef = $mb[1];
+                                    }
+                                ?>
+                                <option value="<?= htmlspecialchars($r['nr_recibo_retornado']) ?>">
+                                    <?= htmlspecialchars($r['nr_recibo_retornado']) ?>
+                                    <?= $cnpjBenef ? " — CNPJ {$cnpjBenef}" : '' ?>
+                                    (<?= htmlspecialchars($r['nome_arquivo']) ?>)
+                                </option>
+                                <?php endforeach; ?>
+                            </select>
+                            <div class="form-text mb-2">
+                                Se deixar em branco na retificação do R-4020, o sistema usa o recibo salvo de cada beneficiário automaticamente.
+                            </div>
+                            <?php endif; ?>
+                            <input type="text" name="nr_recibo_original" id="nr-recibo-input" class="form-control form-control-sm font-monospace" placeholder="Recibo da transmissão original">
+                            <div class="form-text">Informe o recibo retornado pela Receita Federal (ou selecione acima).</div>
                         </div>
                     </div>
 
@@ -162,11 +185,11 @@
             <div class="table-responsive">
                 <table class="table table-sm table-hover mb-0">
                     <thead>
-                        <tr><th>Evento</th><th>Tipo</th><th>Arquivo</th><th>Tamanho</th><th>Assinado</th><th>Gerado em</th><th></th></tr>
+                        <tr><th>Evento</th><th>Tipo</th><th>Arquivo</th><th>Recibo</th><th>Tamanho</th><th>Assinado</th><th>Gerado em</th><th></th></tr>
                     </thead>
                     <tbody>
                         <?php if (empty($arquivosGerados)): ?>
-                        <tr><td colspan="7" class="text-center text-muted py-5">
+                        <tr><td colspan="8" class="text-center text-muted py-5">
                             <i class="bi bi-file-earmark-x display-6 d-block mb-2"></i>
                             Nenhum arquivo gerado para esta competência.
                         </td></tr>
@@ -183,6 +206,15 @@
                                 <?php endif; ?>
                             </td>
                             <td class="font-monospace small text-primary"><?= htmlspecialchars($a['nome_arquivo']) ?></td>
+                            <td class="font-monospace small">
+                                <?php if (!empty($a['nr_recibo_retornado'])): ?>
+                                    <span class="text-success" title="Protocolo: <?= htmlspecialchars($a['protocolo'] ?? '') ?>">
+                                        <?= htmlspecialchars($a['nr_recibo_retornado']) ?>
+                                    </span>
+                                <?php else: ?>
+                                    <span class="text-muted">—</span>
+                                <?php endif; ?>
+                            </td>
                             <td class="small text-muted"><?= number_format(($a['tamanho'] ?? 0) / 1024, 1) ?> KB</td>
                             <td><?= !empty($a['assinado']) ? '<i class="bi bi-check-circle-fill text-success"></i>' : '<i class="bi bi-x-circle text-muted"></i>' ?></td>
                             <td class="small text-muted"><?= date('d/m/Y H:i', strtotime($a['created_at'])) ?></td>
