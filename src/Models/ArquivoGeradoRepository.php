@@ -14,6 +14,19 @@ class ArquivoGeradoRepository extends Repository
         );
     }
 
+    public function listByCompetenciaForUser(int $competenciaId, int $userId): array
+    {
+        return $this->query(
+            "SELECT a.*
+             FROM arquivos_gerados a
+             JOIN competencias c ON c.id = a.competencia_id
+             JOIN contribuintes co ON co.id = c.contribuinte_id
+             WHERE a.competencia_id = ? AND co.usuario_id = ?
+             ORDER BY a.created_at DESC",
+            [$competenciaId, $userId]
+        );
+    }
+
     public function findForUser(int $id, int $userId): ?array
     {
         return $this->queryOne(

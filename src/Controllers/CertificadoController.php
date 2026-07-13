@@ -3,22 +3,26 @@
 namespace App\Controllers;
 
 use App\Models\CertificadoRepository;
+use App\Models\ContribuinteRepository;
 use App\Services\CertificadoCrypto;
 
 class CertificadoController extends BaseController
 {
     private CertificadoRepository $repo;
+    private ContribuinteRepository $contribuintes;
 
     public function __construct(array $config)
     {
         parent::__construct($config);
-        $this->repo = new CertificadoRepository($this->db);
+        $this->repo          = new CertificadoRepository($this->db);
+        $this->contribuintes = new ContribuinteRepository($this->db);
     }
 
     public function index(): void
     {
         $this->requireLogin();
-        $certs = $this->repo->listAll();
+        $uid   = $this->userId();
+        $certs = $this->repo->listByUser($uid);
 
         $certAtivo = null;
         foreach ($certs as $c) {
@@ -39,15 +43,18 @@ class CertificadoController extends BaseController
         }
 
         $this->view('pages/certificados/index', [
-            'pageTitle'    => 'Certificado Digital A1',
-            'certificados' => $certs,
-            'certAtivo'    => $certAtivo,
+            'pageTitle'     => 'Certificado Digital A1',
+            'certificados'  => $certs,
+            'certAtivo'     => $certAtivo,
+            'contribuintes' => $this->contribuintes->listByUser($uid),
+            'flash'         => $this->getFlash(),
         ]);
     }
 
     public function upload(): void
     {
         $this->requireLogin();
+        $uid = $this->userId();
 
         if (empty($_FILES['certificado']['tmp_name'])) {
             $this->redirect('/certificados', 'Selecione um arquivo PFX/P12.', 'erro');
@@ -56,8 +63,22 @@ class CertificadoController extends BaseController
         $file = $_FILES['certificado'];
         $ext  = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
 
-        if (!in_array($ext, ['pfx', 'p12'])) {
+        if (!in_array($ext, ['pfx', 'p12'], true)) {
             $this->redirect('/certificados', 'Apenas .pfx ou .p12.', 'erro');
+        }
+
+        $meusContribuintes = $this->contribuintes->listByUser($uid);
+        if (empty($meusContribuintes)) {
+            $this->redirect('/certificados', 'Cadastre um contribuinte antes de enviar o certificado.', 'erro');
+        }
+
+        $contribId = (int) $this->post('contribuinte_id', 0);
+        if (!$contribId && count($meusContribuintes) === 1) {
+            $contribId = (int) $meusContribuintes[0]['id'];
+        }
+
+        if (!$this->contribuintes->findByUser($contribId, $uid)) {
+            $this->redirect('/certificados', 'Contribuinte inválido.', 'erro');
         }
 
         $senha      = $this->post('senha', '');
@@ -73,7 +94,6 @@ class CertificadoController extends BaseController
         $validTo  = $certData['validTo_time_t'] ?? 0;
         $cnpjCert = '';
 
-        // OU pode ser string ou array (múltiplas OUs)
         $ouField = $certData['subject']['OU'] ?? '';
         if (is_array($ouField)) {
             $ouField = implode(' ', $ouField);
@@ -82,18 +102,21 @@ class CertificadoController extends BaseController
             $cnpjCert = $m[0];
         }
 
-        $destDir = $this->config['reinf']['cert_path'] ?? BASE_PATH . '/storage/certs/';
+        $destDir = $this->config['reinf']['cert_path'] ?? (BASE_PATH . '/storage/certs/');
+        if (!str_starts_with($destDir, '/')) {
+            $destDir = BASE_PATH . '/' . ltrim($destDir, './');
+        }
+        $destDir = rtrim($destDir, '/') . '/';
         if (!is_dir($destDir)) {
             mkdir($destDir, 0755, true);
         }
-        $destFile = $destDir . 'cert_' . date('Ymd_His') . '.' . $ext;
+        $destFile = $destDir . 'cert_u' . $uid . '_' . date('Ymd_His') . '.' . $ext;
         move_uploaded_file($file['tmp_name'], $destFile);
         chmod($destFile, 0600);
 
-        $contribId = (int) $this->post('contribuinte_id', 1);
-        $senhaEnc  = CertificadoCrypto::encrypt($senha, CertificadoCrypto::secretFromConfig($this->config));
+        $senhaEnc = CertificadoCrypto::encrypt($senha, CertificadoCrypto::secretFromConfig($this->config));
 
-        $this->repo->desativarTodos($contribId);
+        $this->repo->desativarTodosDoUsuario($uid, $contribId);
         $this->repo->criarComSenha($contribId, $file['name'], $destFile, $senhaEnc, $cnpjCert, $cn, date('Y-m-d', $validTo));
 
         $this->redirect('/certificados', "Certificado '{$cn}' importado! Válido até " . date('d/m/Y', $validTo), 'sucesso');

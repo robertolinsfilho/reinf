@@ -6,16 +6,17 @@ class TransmissaoLogRepository extends Repository
 {
     protected string $table = 'transmissoes';
 
-    public function historico(int $limit = 50): array
+    public function historicoByUser(int $userId, int $limit = 50): array
     {
         return $this->query("
             SELECT t.*, c.periodo, ct.cnpj, ct.razao_social
             FROM transmissoes t
             JOIN competencias c ON c.id = t.competencia_id
             JOIN contribuintes ct ON ct.id = c.contribuinte_id
+            WHERE t.usuario_id = ? OR ct.usuario_id = ?
             ORDER BY t.created_at DESC
             LIMIT ?
-        ", [$limit]);
+        ", [$userId, $userId, $limit]);
     }
 
     public function registrarEnvio(int $compId, int $userId, string $evento, array $resultado): int

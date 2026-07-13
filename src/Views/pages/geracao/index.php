@@ -1,20 +1,61 @@
-<?php
-$flash = null;
-if (isset($_SESSION['flash'])) { $flash = $_SESSION['flash']; unset($_SESSION['flash']); }
-?>
 <?php if (!empty($flash)): ?>
-<div class="alert alert-<?= ($flash['tipo'] === 'sucesso' || $flash['tipo'] === 'success') ? 'success' : 'danger' ?> flash-alert">
+<div class="alert alert-<?= ($flash['tipo'] === 'sucesso' || $flash['tipo'] === 'success') ? 'success' : (($flash['tipo'] ?? '') === 'erro' || ($flash['tipo'] ?? '') === 'danger' ? 'danger' : 'info') ?> flash-alert">
     <?= htmlspecialchars($flash['mensagem']) ?>
 </div>
 <?php endif; ?>
 
 <div class="page-header">
     <h5><i class="bi bi-file-earmark-code me-2"></i>Gerar XML EFD-REINF</h5>
+    <?php if ($competencia): ?>
     <div class="d-flex gap-2">
         <span class="badge bg-secondary align-self-center"><?= htmlspecialchars($competencia['razao_social']) ?> | <?= $competencia['periodo'] ?></span>
-        <a href="/competencias/detalhe?id=<?= $competencia['id'] ?>" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i> Voltar</a>
+        <a href="/gerar" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i> Trocar competência</a>
+    </div>
+    <?php endif; ?>
+</div>
+
+<?php if (!$competencia): ?>
+<div class="card">
+    <div class="card-header"><i class="bi bi-calendar3 me-2"></i>Selecione a competência</div>
+    <div class="card-body">
+        <?php if (empty($competencias)): ?>
+        <div class="text-center text-muted py-4">
+            Nenhuma competência cadastrada.
+            <div class="mt-2"><a href="/competencias/nova" class="btn btn-primary btn-sm">Criar competência</a></div>
+        </div>
+        <?php else: ?>
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Contribuinte</th>
+                        <th>Período</th>
+                        <th>Status</th>
+                        <th>R-4020</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($competencias as $c): ?>
+                    <tr>
+                        <td><?= htmlspecialchars($c['razao_social']) ?></td>
+                        <td class="font-monospace"><?= htmlspecialchars($c['periodo']) ?></td>
+                        <td><span class="badge bg-secondary"><?= htmlspecialchars($c['status'] ?? '') ?></span></td>
+                        <td><?= (int) ($c['total_r4020'] ?? 0) ?></td>
+                        <td class="text-end">
+                            <a href="/gerar?competencia_id=<?= (int) $c['id'] ?>" class="btn btn-primary btn-sm">
+                                <i class="bi bi-file-earmark-code me-1"></i> Gerar XML
+                            </a>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+        <?php endif; ?>
     </div>
 </div>
+<?php else: ?>
 
 <div class="row g-3">
     <div class="col-lg-5">
@@ -22,7 +63,7 @@ if (isset($_SESSION['flash'])) { $flash = $_SESSION['flash']; unset($_SESSION['f
             <div class="card-header">Selecionar Eventos</div>
             <div class="card-body p-4">
                 <form action="/gerar/xml" method="POST">
-    <?= $csrfField ?>
+                    <?= $csrfField ?>
                     <input type="hidden" name="competencia_id" value="<?= $competencia['id'] ?>">
 
                     <div class="mb-3">
@@ -30,29 +71,29 @@ if (isset($_SESSION['flash'])) { $flash = $_SESSION['flash']; unset($_SESSION['f
                         <div class="d-grid gap-2">
                             <?php
                             $eventosList = [
-                                'R1000' => ['R-1000 – Informações do Contribuinte', 'bi-building', true],
-                                'R1070' => ['R-1070 – Processos Admin./Judiciais', 'bi-folder2-open', true],
-                                'R2010' => ['R-2010 – Retenções INSS (Tomados)', 'bi-arrow-down-left-circle', $eventosDisponiveis['R2010'] ?? false],
-                                'R2020' => ['R-2020 – Retenções INSS (Prestados)', 'bi-arrow-up-right-circle', $eventosDisponiveis['R2020'] ?? false],
-                                'R2060' => ['R-2060 – CPRB', 'bi-calculator', $eventosDisponiveis['R2060'] ?? false],
-                                'R4010' => ['R-4010 – Pagamentos PF (IRRF)', 'bi-person', $eventosDisponiveis['R4010'] ?? false],
-                                'R4020' => ['R-4020 – Pagamentos PJ (IRRF/CSRF)', 'bi-building', $eventosDisponiveis['R4020'] ?? false],
-                                'R2099' => ['R-2099 – Fechamento Série R-2000', 'bi-lock', true],
-                                'R4099' => ['R-4099 – Fechamento Série R-4000', 'bi-lock-fill', true],
-                                'R9000' => ['R-9000 – Exclusão de Evento', 'bi-trash', true],
+                                'R1000' => ['R-1000 – Informações do Contribuinte', true],
+                                'R1070' => ['R-1070 – Processos Admin./Judiciais', true],
+                                'R2010' => ['R-2010 – Retenções INSS (Tomados)', $eventosDisponiveis['R2010'] ?? false],
+                                'R2020' => ['R-2020 – Retenções INSS (Prestados)', $eventosDisponiveis['R2020'] ?? false],
+                                'R2060' => ['R-2060 – CPRB', $eventosDisponiveis['R2060'] ?? false],
+                                'R4010' => ['R-4010 – Pagamentos PF (IRRF)', $eventosDisponiveis['R4010'] ?? false],
+                                'R4020' => ['R-4020 – Pagamentos PJ (IRRF/CSRF)', $eventosDisponiveis['R4020'] ?? false],
+                                'R2099' => ['R-2099 – Fechamento Série R-2000', true],
+                                'R4099' => ['R-4099 – Fechamento Série R-4000', true],
+                                'R9000' => ['R-9000 – Exclusão de Evento', true],
                             ];
-                            foreach ($eventosList as $cod => [$desc, $icon, $temDados]):
-                                $disabled = !$temDados && !in_array($cod, ['R1000','R1070','R2099','R4099','R9000']);
+                            foreach ($eventosList as $cod => [$desc, $temDados]):
+                                $disabled = !$temDados && !in_array($cod, ['R1000','R1070','R2099','R4099','R9000'], true);
                             ?>
                             <div class="form-check border rounded p-3 ps-5 <?= $disabled ? 'opacity-50' : '' ?>" style="cursor:<?= $disabled ? 'not-allowed' : 'pointer' ?>">
                                 <input class="form-check-input" type="checkbox" name="eventos[]"
                                        value="<?= $cod ?>" id="ev-<?= $cod ?>"
                                        <?= $disabled ? 'disabled' : '' ?>
-                                       <?= ($temDados && !in_array($cod, ['R1000','R2099','R4099','R9000'])) ? 'checked' : '' ?>>
+                                       <?= ($temDados && !in_array($cod, ['R1000','R2099','R4099','R9000'], true)) ? 'checked' : '' ?>>
                                 <label class="form-check-label w-100" for="ev-<?= $cod ?>" style="cursor:inherit">
                                     <span class="badge bg-primary me-1"><?= $cod ?></span>
                                     <span style="font-size:.85rem"><?= $desc ?></span>
-                                    <?php if ($temDados && !in_array($cod, ['R1000','R2099','R4099','R9000'])): ?>
+                                    <?php if ($temDados && !in_array($cod, ['R1000','R2099','R4099','R9000'], true)): ?>
                                         <i class="bi bi-check-circle-fill text-success ms-1" title="Tem registros"></i>
                                     <?php elseif ($disabled): ?>
                                         <small class="text-muted ms-1">(sem registros)</small>
@@ -62,7 +103,7 @@ if (isset($_SESSION['flash'])) { $flash = $_SESSION['flash']; unset($_SESSION['f
                             <?php endforeach; ?>
                         </div>
                     </div>
-                    <!-- Tipo: Inclusão ou Retificação -->
+
                     <div class="mb-3 p-3 border rounded bg-light">
                         <label class="form-label fw-bold mb-2">
                             <i class="bi bi-arrow-repeat me-1"></i> Tipo de Operação
@@ -85,7 +126,7 @@ if (isset($_SESSION['flash'])) { $flash = $_SESSION['flash']; unset($_SESSION['f
                             <div class="form-text">Informe o recibo retornado pela Receita Federal na transmissão original.</div>
                         </div>
                     </div>
-                    <!-- Opção de assinatura -->
+
                     <div class="form-check form-switch mb-3 p-3 ps-5 border rounded bg-light">
                         <input class="form-check-input" type="checkbox" name="assinar" id="chk-assinar" value="1"
                                <?= ($certInfo['valido'] ?? false) ? 'checked' : 'disabled' ?>>
@@ -125,12 +166,12 @@ if (isset($_SESSION['flash'])) { $flash = $_SESSION['flash']; unset($_SESSION['f
                     </thead>
                     <tbody>
                         <?php if (empty($arquivosGerados)): ?>
-                        <tr><td colspan="6" class="text-center text-muted py-5">
+                        <tr><td colspan="7" class="text-center text-muted py-5">
                             <i class="bi bi-file-earmark-x display-6 d-block mb-2"></i>
                             Nenhum arquivo gerado para esta competência.
                         </td></tr>
                         <?php else: foreach ($arquivosGerados as $a): ?>
-                      <tr>
+                        <tr>
                             <td><span class="badge bg-primary"><?= $a['evento'] ?? '—' ?></span></td>
                             <td>
                                 <?php if (($a['ind_retif'] ?? 1) == 2): ?>
@@ -161,12 +202,12 @@ if (isset($_SESSION['flash'])) { $flash = $_SESSION['flash']; unset($_SESSION['f
             <div class="card-header"><i class="bi bi-info-circle me-2"></i>Informações</div>
             <div class="card-body small text-muted">
                 <ul class="mb-0 ps-3">
-                    <li>XMLs gerados conforme leiaute EFD-REINF <strong>v2.1.2</strong> (namespace <code>v2_01_02</code>)</li>
+                    <li>XMLs gerados conforme leiaute EFD-REINF <strong>v2.1.2</strong></li>
                     <li>Ambiente: <strong><?= ($config['reinf']['tp_amb'] ?? 2) === 1 ? 'Produção' : 'Homologação' ?></strong></li>
-                    <li>Eventos só podem ser gerados se houver registros na competência (exceto R-1000, fechamentos e exclusão)</li>
-                    <li>Após gerar, vá para <a href="/transmissao?competencia_id=<?= $competencia['id'] ?>"><strong>Transmissão</strong></a> para enviar à Receita Federal</li>
+                    <li>Após gerar, vá para <a href="/transmissao?competencia_id=<?= $competencia['id'] ?>"><strong>Transmissão</strong></a></li>
                 </ul>
             </div>
         </div>
     </div>
 </div>
+<?php endif; ?>

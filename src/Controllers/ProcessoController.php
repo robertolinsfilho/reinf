@@ -85,8 +85,12 @@ class ProcessoController extends BaseController
             'status'             => $this->post('status', 'ativo'),
         ];
 
-        $this->safeExecute(function () use ($id, $dados) {
+        $this->safeExecute(function () use ($id, $uid, $dados) {
             if ($id) {
+                $proc = $this->repo->findByUser($id, $uid);
+                if (!$proc) {
+                    $this->redirect('/processos', 'Processo não encontrado.', 'erro');
+                }
                 $this->repo->update($id, $dados);
                 $this->redirect('/processos', 'Processo atualizado!', 'sucesso');
             } else {

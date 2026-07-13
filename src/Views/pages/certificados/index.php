@@ -19,17 +19,33 @@ if (isset($_SESSION['flash'])) { $flash = $_SESSION['flash']; unset($_SESSION['f
             <div class="card-header">Upload de Certificado (PFX / P12)</div>
             <div class="card-body p-4">
                 <form action="/certificados/upload" method="POST" enctype="multipart/form-data">
-    <?= $csrfField ?>
+                    <?= $csrfField ?>
+                    <div class="mb-3">
+                        <label class="form-label">Contribuinte *</label>
+                        <?php if (empty($contribuintes)): ?>
+                            <div class="alert alert-warning py-2 small mb-0">
+                                Cadastre um <a href="/contribuintes/novo">contribuinte</a> antes de enviar o certificado.
+                            </div>
+                        <?php else: ?>
+                        <select name="contribuinte_id" class="form-select" required>
+                            <?php foreach ($contribuintes as $co): ?>
+                            <option value="<?= (int) $co['id'] ?>">
+                                <?= htmlspecialchars($co['razao_social']) ?> — <?= htmlspecialchars($co['cnpj']) ?>
+                            </option>
+                            <?php endforeach; ?>
+                        </select>
+                        <?php endif; ?>
+                    </div>
                     <div class="mb-3">
                         <label class="form-label">Arquivo do Certificado *</label>
-                        <input type="file" name="certificado" class="form-control" accept=".pfx,.p12" required>
+                        <input type="file" name="certificado" class="form-control" accept=".pfx,.p12" required <?= empty($contribuintes) ? 'disabled' : '' ?>>
                         <div class="form-text">Certificado digital tipo A1, formato PFX ou P12.</div>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Senha do Certificado *</label>
-                        <input type="password" name="senha" class="form-control" required placeholder="Senha do arquivo PFX">
+                        <input type="password" name="senha" class="form-control" required placeholder="Senha do arquivo PFX" <?= empty($contribuintes) ? 'disabled' : '' ?>>
                     </div>
-                    <button type="submit" class="btn btn-primary w-100">
+                    <button type="submit" class="btn btn-primary w-100" <?= empty($contribuintes) ? 'disabled' : '' ?>>
                         <i class="bi bi-upload me-1"></i> Enviar Certificado
                     </button>
                 </form>
@@ -96,17 +112,18 @@ if (isset($_SESSION['flash'])) { $flash = $_SESSION['flash']; unset($_SESSION['f
             <div class="table-responsive">
                 <table class="table table-sm table-hover mb-0">
                     <thead>
-                        <tr><th>Arquivo</th><th>Titular</th><th>CNPJ</th><th>Validade</th><th>Status</th><th>Importado</th></tr>
+                        <tr><th>Arquivo</th><th>Contribuinte</th><th>Titular</th><th>CNPJ</th><th>Validade</th><th>Status</th><th>Importado</th></tr>
                     </thead>
                     <tbody>
                         <?php if (empty($certificados)): ?>
-                        <tr><td colspan="6" class="text-center text-muted py-5">
+                        <tr><td colspan="7" class="text-center text-muted py-5">
                             <i class="bi bi-shield-x display-6 d-block mb-2"></i>
                             Nenhum certificado cadastrado.
                         </td></tr>
                         <?php else: foreach ($certificados as $c): ?>
                         <tr class="<?= $c['ativo'] ? 'table-success' : '' ?>">
                             <td class="small"><?= htmlspecialchars($c['nome_arquivo'] ?? '') ?></td>
+                            <td style="font-size:.82rem"><?= htmlspecialchars($c['razao_social'] ?? '—') ?></td>
                             <td style="font-size:.82rem"><?= htmlspecialchars($c['titular'] ?? '—') ?></td>
                             <td class="font-monospace small"><?= $c['cnpj_certificado'] ?? '—' ?></td>
                             <td class="small"><?= $c['validade'] ? date('d/m/Y', strtotime($c['validade'])) : '—' ?></td>

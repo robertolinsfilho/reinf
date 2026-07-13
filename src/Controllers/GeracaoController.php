@@ -29,12 +29,21 @@ class GeracaoController extends BaseController
         $compId = (int) $this->get('competencia_id');
 
         if (!$compId) {
-            $this->redirect('/competencias', 'Selecione uma competência.', 'erro');
+            $this->view('pages/geracao/index', [
+                'pageTitle'          => 'Gerar XML',
+                'competencia'        => null,
+                'competencias'       => $this->competencias->listByUser($this->userId()),
+                'eventosDisponiveis' => [],
+                'arquivosGerados'    => [],
+                'certInfo'           => (new AssinaturaService($this->userId()))->infoCertificado(),
+                'flash'              => $this->getFlash(),
+            ]);
+            return;
         }
 
         $comp = $this->competencias->findWithContribuinte($compId, $this->userId());
         if (!$comp) {
-            $this->redirect('/competencias', 'Competência não encontrada.', 'erro');
+            $this->redirect('/gerar', 'Competência não encontrada.', 'erro');
         }
 
         $disponiveis = ['R1000' => true, 'R1070' => true];
@@ -45,9 +54,11 @@ class GeracaoController extends BaseController
         $this->view('pages/geracao/index', [
             'pageTitle'          => 'Gerar XML',
             'competencia'        => $comp,
+            'competencias'       => [],
             'eventosDisponiveis' => $disponiveis,
-            'arquivosGerados'    => $this->arquivos->listByCompetencia($compId),
-            'certInfo'           => (new AssinaturaService())->infoCertificado(),
+            'arquivosGerados'    => $this->arquivos->listByCompetenciaForUser($compId, $this->userId()),
+            'certInfo'           => (new AssinaturaService($this->userId()))->infoCertificado(),
+            'flash'              => $this->getFlash(),
         ]);
     }
 
@@ -101,7 +112,7 @@ class GeracaoController extends BaseController
 
             // Assinar se solicitado
             if ($assinar) {
-                $assinatura = new AssinaturaService();
+                $assinatura = new AssinaturaService($this->userId());
                 foreach ($arquivos as &$arq) {
                     $arq['xml']     = $assinatura->assinar($arq['xml']);
                     file_put_contents($arq['caminho'], $arq['xml']);

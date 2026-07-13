@@ -1,41 +1,65 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Models;
 
 class CertificadoRepository extends Repository
 {
     protected string $table = 'certificados';
 
-    public function listAll(): array
+    public function listByUser(int $userId): array
     {
-        return $this->query("SELECT * FROM certificados ORDER BY created_at DESC");
+        return $this->query("
+            SELECT cert.*, co.razao_social, co.cnpj AS cnpj_contribuinte
+            FROM certificados cert
+            JOIN contribuintes co ON co.id = cert.contribuinte_id
+            WHERE co.usuario_id = ?
+            ORDER BY cert.ativo DESC, cert.created_at DESC
+        ", [$userId]);
     }
 
-    public function findAtivo(): ?array
+    public function findAtivoByUser(int $userId): ?array
     {
-        return $this->queryOne("SELECT * FROM certificados WHERE ativo = 1 ORDER BY id DESC LIMIT 1");
+        return $this->queryOne("
+            SELECT cert.*
+            FROM certificados cert
+            JOIN contribuintes co ON co.id = cert.contribuinte_id
+            WHERE co.usuario_id = ? AND cert.ativo = 1
+            ORDER BY cert.id DESC
+            LIMIT 1
+        ", [$userId]);
     }
 
-    public function desativarTodos(int $contribuinteId): void
+    public function desativarTodosDoUsuario(int $userId, ?int $contribuinteId = null): void
     {
-        $this->db->prepare("UPDATE certificados SET ativo = 0 WHERE contribuinte_id = ?")->execute([$contribuinteId]);
+        if ($contribuinteId) {
+            $this->db->prepare("
+                UPDATE certificados cert
+                JOIN contribuintes co ON co.id = cert.contribuinte_id
+                SET cert.ativo = 0
+                WHERE co.usuario_id = ? AND cert.contribuinte_id = ?
+            ")->execute([$userId, $contribuinteId]);
+            return;
+        }
+
+        $this->db->prepare("
+            UPDATE certificados cert
+            JOIN contribuintes co ON co.id = cert.contribuinte_id
+            SET cert.ativo = 0
+            WHERE co.usuario_id = ?
+        ")->execute([$userId]);
     }
 
-    public function criar(int $contribId, string $nomeArq, string $caminho, string $cnpj, string $titular, string $validade): int
-    {
-        return $this->insert([
-            'contribuinte_id'  => $contribId,
-            'nome_arquivo'     => $nomeArq,
-            'caminho'          => $caminho,
-            'cnpj_certificado' => $cnpj,
-            'titular'          => $titular,
-            'validade'         => $validade,
-            'ativo'            => 1,
-        ]);
-    }
-
-    public function criarComSenha(int $contribId, string $nomeArq, string $caminho, string $senhaEnc, string $cnpj, string $titular, string $validade): int
-    {
+    public function criarComSenha(
+        int $contribId,
+        string $nomeArq,
+        string $caminho,
+        string $senhaEnc,
+        string $cnpj,
+        string $titular,
+        string $validade
+    ): int {
         return $this->insert([
             'contribuinte_id'  => $contribId,
             'nome_arquivo'     => $nomeArq,

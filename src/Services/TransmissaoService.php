@@ -11,13 +11,13 @@ class TransmissaoService
     private int $tpAmb;
     private AssinaturaService $assinatura;
 
-    public function __construct(private \PDO $db)
+    public function __construct(private \PDO $db, private ?int $userId = null)
     {
         $config = \App\Models\AppConfig::get();
         $this->urlEnvio    = $config['reinf']['ws_envio'] ?? [];
         $this->urlConsulta = $config['reinf']['ws_consulta'] ?? [];
         $this->tpAmb       = (int) ($config['reinf']['tp_amb'] ?? 2);
-        $this->assinatura  = new AssinaturaService();
+        $this->assinatura  = new AssinaturaService($userId);
     }
 
     /**
@@ -53,9 +53,13 @@ class TransmissaoService
         $tempo   = (int) ((microtime(true) - $inicio) * 1000);
 
         $sucessoEnvio = in_array($retorno['http_code'], [200, 201, 202], true);
+        $descRetorno  = $this->extrairOcorrencias($retorno['body'])
+            ?: ($this->extrairTag($retorno['body'], 'descResposta')
+                ?: $this->extrairTag($retorno['body'], 'descRetorno')
+                ?: ($sucessoEnvio ? 'Lote recebido — aguardando processamento' : $retorno['body']));
 
         return [
-            'sucesso'                  => $sucessoEnvio,
+            'sucesso'                  => $sucessoEnvio && !$this->temOcorrenciaErro($retorno['body']),
             'assincrono'               => true,
             'aguardando_processamento' => $sucessoEnvio,
             'http_code'                => $retorno['http_code'],
@@ -66,9 +70,7 @@ class TransmissaoService
             'codigo_retorno'           => $this->extrairTag($retorno['body'], 'cdResposta')
                                           ?: $this->extrairTag($retorno['body'], 'cdRetorno')
                                           ?: (string) $retorno['http_code'],
-            'desc_retorno'             => $this->extrairTag($retorno['body'], 'descResposta')
-                                          ?: $this->extrairTag($retorno['body'], 'descRetorno')
-                                          ?: ($sucessoEnvio ? 'Lote recebido — aguardando processamento' : $retorno['body']),
+            'desc_retorno'             => $descRetorno,
             'tempo_ms'                 => $tempo,
             'ambiente'                 => $this->tpAmb,
         ];
@@ -127,8 +129,11 @@ class TransmissaoService
         ];
     }
 
-    private function montarLote(string $cnpj, array $eventosXml): string
+    private function montarLote(string $nrInsc, array $eventosXml): string
     {
+        $nrInsc = preg_replace('/\D/', '', $nrInsc) ?? '';
+        $tpInsc = strlen($nrInsc) <= 11 ? '2' : '1';
+
         $eventosStr = '';
         foreach ($eventosXml as $i => $xml) {
             $xml = preg_replace('/<\?xml[^?]+\?>\s*/', '', $xml);
@@ -140,8 +145,8 @@ class TransmissaoService
              . '       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">' . "\n"
              . "  <envioLoteEventos>\n"
              . "    <ideContribuinte>\n"
-             . "      <tpInsc>1</tpInsc>\n"
-             . "      <nrInsc>{$cnpj}</nrInsc>\n"
+             . "      <tpInsc>{$tpInsc}</tpInsc>\n"
+             . "      <nrInsc>{$nrInsc}</nrInsc>\n"
              . "    </ideContribuinte>\n"
              . "    <eventos>\n"
              . $eventosStr
@@ -216,10 +221,21 @@ class TransmissaoService
     private function extrairCertificadoTemporario(): ?array
     {
         $repo      = new \App\Models\CertificadoRepository($this->db);
-        $certAtivo = $repo->findAtivo();
-        if (!$certAtivo || !file_exists($certAtivo['caminho'])) {
+        $certAtivo = $this->userId
+            ? $repo->findAtivoByUser($this->userId)
+            : null;
+        if (!$certAtivo) {
             return null;
         }
+
+        $caminho = (string) ($certAtivo['caminho'] ?? '');
+        if ($caminho !== '' && !str_starts_with($caminho, '/')) {
+            $caminho = rtrim(BASE_PATH, '/') . '/' . ltrim($caminho, './');
+        }
+        if ($caminho === '' || !file_exists($caminho)) {
+            return null;
+        }
+        $certAtivo['caminho'] = $caminho;
 
         $senha = '';
         if (!empty($certAtivo['senha_encrypted'])) {
@@ -254,5 +270,37 @@ class TransmissaoService
             return trim($m[1]);
         }
         return '';
+    }
+
+    private function extrairOcorrencias(string $xml): string
+    {
+        if (!preg_match_all('/<ocorrencia>(.*?)<\/ocorrencia>/is', $xml, $blocos)) {
+            return '';
+        }
+        $msgs = [];
+        foreach ($blocos[1] as $bloco) {
+            $cod  = '';
+            $desc = '';
+            if (preg_match('/<codigo>([^<]*)<\/codigo>/i', $bloco, $m)) {
+                $cod = trim($m[1]);
+            }
+            if (preg_match('/<descricao>([^<]*)<\/descricao>/i', $bloco, $m)) {
+                $desc = trim($m[1]);
+            }
+            if ($cod !== '' || $desc !== '') {
+                $msgs[] = trim(($cod !== '' ? "{$cod}: " : '') . $desc);
+            }
+        }
+        return implode(' | ', $msgs);
+    }
+
+    private function temOcorrenciaErro(string $xml): bool
+    {
+        // cdResposta 7 = lote não recebido; qualquer ocorrência tipo 1 também
+        $cd = $this->extrairTag($xml, 'cdResposta') ?: $this->extrairTag($xml, 'cdRetorno');
+        if (in_array($cd, ['7', '8', '9'], true)) {
+            return true;
+        }
+        return (bool) preg_match('/<ocorrencia>/i', $xml);
     }
 }

@@ -10,12 +10,14 @@ class AssinaturaService
 {
     private string $certPath;
     private string $certPass;
+    private ?int $userId;
 
-    public function __construct()
+    public function __construct(?int $userId = null)
     {
         $config = \App\Models\AppConfig::get();
         $this->certPath = $config['reinf']['cert_path'] ?? '';
         $this->certPass = $config['reinf']['cert_pass'] ?? '';
+        $this->userId   = $userId;
     }
 
     /**
@@ -24,11 +26,9 @@ class AssinaturaService
      */
     public function assinar(string $xml, ?string $pfxPath = null, ?string $pfxPass = null): string
     {
-        // Se não veio explícito, tenta do banco (certificado ativo)
+        // Se não veio explícito, tenta do banco (certificado ativo do usuário)
         if (!$pfxPath || !$pfxPass) {
-            $db   = \App\Models\Database::getInstance();
-            $repo = new \App\Models\CertificadoRepository($db);
-            $certAtivo = $repo->findAtivo();
+            $certAtivo = $this->carregarCertificadoAtivo();
             if ($certAtivo) {
                 $pfxPath = $pfxPath ?: $certAtivo['caminho'];
                 if (!$pfxPass && !empty($certAtivo['senha_encrypted'])) {
@@ -77,12 +77,9 @@ class AssinaturaService
      */
     public function infoCertificado(?string $pfxPath = null, ?string $pfxPass = null): array
     {
-        // Se não veio explícito, tenta do banco (certificado ativo)
         if (!$pfxPath || !$pfxPass) {
             try {
-                $db   = \App\Models\Database::getInstance();
-                $repo = new \App\Models\CertificadoRepository($db);
-                $certAtivo = $repo->findAtivo();
+                $certAtivo = $this->carregarCertificadoAtivo();
                 if ($certAtivo) {
                     $pfxPath = $pfxPath ?: $certAtivo['caminho'];
                     if (!$pfxPass && !empty($certAtivo['senha_encrypted'])) {
@@ -136,8 +133,31 @@ class AssinaturaService
         ];
     }
 
+    private function carregarCertificadoAtivo(): ?array
+    {
+        if (!$this->userId) {
+            return null;
+        }
+        $db   = \App\Models\Database::getInstance();
+        $repo = new \App\Models\CertificadoRepository($db);
+        $cert = $repo->findAtivoByUser($this->userId);
+        if (!$cert) {
+            return null;
+        }
+        $caminho = (string) ($cert['caminho'] ?? '');
+        if ($caminho !== '' && !str_starts_with($caminho, '/')) {
+            $caminho = rtrim(BASE_PATH, '/') . '/' . ltrim($caminho, './');
+            $cert['caminho'] = $caminho;
+        }
+        return $cert;
+    }
+
     private function findCertificado(): ?string
     {
+        // Com usuário autenticado, só usa certificado do banco (não varrer pasta compartilhada)
+        if ($this->userId) {
+            return null;
+        }
         if (!is_dir($this->certPath)) {
             return null;
         }
