@@ -75,6 +75,7 @@
                                 'R1070' => ['R-1070 – Processos Admin./Judiciais', true],
                                 'R2010' => ['R-2010 – Retenções INSS (Tomados)', $eventosDisponiveis['R2010'] ?? false],
                                 'R2020' => ['R-2020 – Retenções INSS (Prestados)', $eventosDisponiveis['R2020'] ?? false],
+                                'R2055' => ['R-2055 – Aquisição Prod. Rural', $eventosDisponiveis['R2055'] ?? false],
                                 'R2060' => ['R-2060 – CPRB', $eventosDisponiveis['R2060'] ?? false],
                                 'R4010' => ['R-4010 – Pagamentos PF (IRRF)', $eventosDisponiveis['R4010'] ?? false],
                                 'R4020' => ['R-4020 – Pagamentos PJ (IRRF/CSRF)', $eventosDisponiveis['R4020'] ?? false],
@@ -122,27 +123,33 @@
                         </div>
                         <div id="campo-recibo" style="display:none" class="mt-2">
                             <label class="form-label small mb-1">Número do Recibo Original</label>
-                            <?php $recibosR4020 = $recibosR4020 ?? []; ?>
-                            <?php if (!empty($recibosR4020)): ?>
+                            <?php $recibosSalvos = $recibosSalvos ?? ($recibosR4020 ?? []); ?>
+                            <?php if (!empty($recibosSalvos)): ?>
                             <select class="form-select form-select-sm font-monospace mb-2"
                                     onchange="document.getElementById('nr-recibo-input').value=this.value">
-                                <option value="">Usar recibo salvo por beneficiário (R-4020)</option>
-                                <?php foreach ($recibosR4020 as $r): ?>
+                                <option value="">Usar recibo salvo automaticamente (R-2010 / R-2055 / R-4020)</option>
+                                <?php foreach ($recibosSalvos as $r): ?>
                                 <?php
-                                    $cnpjBenef = '';
-                                    if (!empty($r['xml_conteudo']) && preg_match('/<cnpjBenef>(\d+)<\/cnpjBenef>/', $r['xml_conteudo'], $mb)) {
-                                        $cnpjBenef = $mb[1];
+                                    $detalhe = '';
+                                    $xml = (string) ($r['xml_conteudo'] ?? '');
+                                    if (($r['evento'] ?? '') === 'R4020' && preg_match('/<cnpjBenef>(\d+)<\/cnpjBenef>/', $xml, $mb)) {
+                                        $detalhe = ' — CNPJ ' . $mb[1];
+                                    } elseif (($r['evento'] ?? '') === 'R2010' && preg_match('/<cnpjPrestador>(\d+)<\/cnpjPrestador>/', $xml, $mp)) {
+                                        $detalhe = ' — prestador ' . $mp[1];
+                                    } elseif (($r['evento'] ?? '') === 'R2055' && preg_match('/<nrInscProd>(\d+)<\/nrInscProd>/', $xml, $mp)) {
+                                        $detalhe = ' — produtor ' . $mp[1];
                                     }
                                 ?>
                                 <option value="<?= htmlspecialchars($r['nr_recibo_retornado']) ?>">
+                                    [<?= htmlspecialchars($r['evento'] ?? '?') ?>]
                                     <?= htmlspecialchars($r['nr_recibo_retornado']) ?>
-                                    <?= $cnpjBenef ? " — CNPJ {$cnpjBenef}" : '' ?>
+                                    <?= htmlspecialchars($detalhe) ?>
                                     (<?= htmlspecialchars($r['nome_arquivo']) ?>)
                                 </option>
                                 <?php endforeach; ?>
                             </select>
                             <div class="form-text mb-2">
-                                Se deixar em branco na retificação do R-4020, o sistema usa o recibo salvo de cada beneficiário automaticamente.
+                                Se deixar em branco: R-4020/R-2055 usam recibo por beneficiário/produtor; R-2010 usa o último recibo da competência.
                             </div>
                             <?php endif; ?>
                             <input type="text" name="nr_recibo_original" id="nr-recibo-input" class="form-control form-control-sm font-monospace" placeholder="Recibo da transmissão original">

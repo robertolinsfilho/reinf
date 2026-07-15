@@ -116,11 +116,15 @@ class EventoController extends BaseController
                 'cnpj_prestador'         => $this->postCnpj('cnpj_prestador'),
                 'razao_social_prestador' => $this->sanitize($this->post('razao_social_prestador', '')),
                 'tipo_insc_prestador'    => $this->post('tipo_insc_prestador', '1'),
+                'serie'                  => $this->sanitize($this->post('serie', '0')) ?: '0',
                 'num_documento'          => $this->sanitize($this->post('num_documento', '')),
                 'data_emissao'           => $this->post('data_emissao'),
                 'valor_bruto'            => $this->postMoney('valor_bruto'),
+                'valor_base_retencao'    => $this->postMoney('valor_base_retencao') ?: $this->postMoney('valor_bruto'),
                 'valor_retencao'         => $this->postMoney('valor_retencao'),
                 'valor_desc_senar'       => $this->postMoney('valor_desc_senar'),
+                'cod_servico'            => preg_replace('/\D/', '', $this->post('cod_servico', '100000001')) ?: '100000001',
+                'ind_cprb'               => in_array($this->post('ind_cprb', '0'), ['0', '1'], true) ? $this->post('ind_cprb', '0') : '0',
             ];
 
             if ($id) {
@@ -169,6 +173,61 @@ class EventoController extends BaseController
     public function excluirR2020(): void
     {
         $this->excluirEvento('r2020', '/eventos/r2020');
+    }
+
+    // ═══ R-2055 ══════════════════════════════════════════════
+
+    public function r2055(): void
+    {
+        $this->listarEvento('r2055', 'pages/eventos/r2055', 'R-2055 – Aquisição de Produção Rural');
+    }
+
+    public function salvarR2055(): void
+    {
+        $this->requireLogin();
+        $cid = (int) $this->post('competencia_id');
+        $this->getComp($cid);
+
+        $this->safeExecute(function () use ($cid) {
+            $nrAdq  = preg_replace('/\D/', '', $this->post('nr_insc_adquirente', ''));
+            $nrProd = preg_replace('/\D/', '', $this->post('nr_insc_produtor', ''));
+            $tpAdq  = $this->post('tp_insc_adquirente', '1');
+            $tpProd = $this->post('tp_insc_produtor', strlen($nrProd) <= 11 ? '2' : '1');
+            if (!in_array($tpAdq, ['1', '3'], true)) {
+                $tpAdq = '1';
+            }
+            if (!in_array($tpProd, ['1', '2'], true)) {
+                $tpProd = '1';
+            }
+
+            $indAquis = preg_replace('/\D/', '', $this->post('ind_aquis', ''));
+            if ($indAquis === '') {
+                $indAquis = $tpProd === '1' ? '3' : '1';
+            }
+
+            $indOpc = strtoupper(trim($this->post('ind_opc_cp', '')));
+            $indOpc = $indOpc === 'S' ? 'S' : null;
+
+            $this->eventos->inserir('r2055', [
+                'competencia_id'     => $cid,
+                'tp_insc_adquirente' => $tpAdq,
+                'nr_insc_adquirente' => $nrAdq,
+                'tp_insc_produtor'   => $tpProd,
+                'nr_insc_produtor'   => $nrProd,
+                'ind_opc_cp'         => $indOpc,
+                'ind_aquis'          => $indAquis,
+                'valor_bruto'        => $this->postMoney('valor_bruto'),
+                'valor_cp_desc'      => $this->postMoney('valor_cp_desc'),
+                'valor_rat_desc'     => $this->postMoney('valor_rat_desc'),
+                'valor_senar_desc'   => $this->postMoney('valor_senar_desc'),
+            ]);
+            $this->redirect("/eventos/r2055?competencia_id={$cid}", 'R-2055 salvo!', 'sucesso');
+        }, "/eventos/r2055?competencia_id={$cid}", 'Erro ao salvar R-2055');
+    }
+
+    public function excluirR2055(): void
+    {
+        $this->excluirEvento('r2055', '/eventos/r2055');
     }
 
     // ═══ R-2060 ══════════════════════════════════════════════

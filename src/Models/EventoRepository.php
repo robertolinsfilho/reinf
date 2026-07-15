@@ -6,7 +6,7 @@ namespace App\Models;
 
 class EventoRepository
 {
-    private const TABELAS = ['r2010', 'r2020', 'r2060', 'r4010', 'r4020'];
+    private const TABELAS = ['r2010', 'r2020', 'r2055', 'r2060', 'r4010', 'r4020'];
 
     private const ORDER_WHITELIST = [
         'created_at ASC',
@@ -83,6 +83,7 @@ class EventoRepository
         return [
             'r2010' => $this->listar('r2010', $competenciaId, 'created_at DESC', $limitPorEvento),
             'r2020' => $this->listar('r2020', $competenciaId, 'created_at DESC', $limitPorEvento),
+            'r2055' => $this->listar('r2055', $competenciaId, 'created_at DESC', $limitPorEvento),
             'r2060' => $this->listar('r2060', $competenciaId, 'created_at DESC', $limitPorEvento),
             'r4010' => $this->listar('r4010', $competenciaId, 'data_pagamento DESC', $limitPorEvento),
             'r4020' => $this->listar('r4020', $competenciaId, 'data_pagamento DESC', $limitPorEvento),

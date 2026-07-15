@@ -6,7 +6,7 @@
     <title><?= $pageTitle ?? 'EFD REINF' ?> – <?= $appName ?></title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.11.3/font/bootstrap-icons.min.css">
-    <link rel="stylesheet" href="/css/app.css">
+    <link rel="stylesheet" href="/css/app.css?v=3">
 </head>
 <body class="<?= isset($usuario) ? 'has-sidebar' : '' ?>">
 
@@ -14,8 +14,8 @@
 <!-- Sidebar -->
 <div class="sidebar" id="sidebar">
     <div class="sidebar-brand">
-        <i class="bi bi-receipt-cutoff"></i>
-        <span>EFD REINF</span>
+        <img src="/img/logo-sthepson.png?v=3" alt="STHEPSON" class="brand-logo"
+             width="160" height="40" style="width:160px;height:auto;max-width:100%;display:block;">
     </div>
     <nav class="sidebar-nav">
         <a href="/dashboard" class="nav-item <?= str_contains($_SERVER['REQUEST_URI'], 'dashboard') ? 'active' : '' ?>">
@@ -37,6 +37,9 @@
         </a>
         <a href="/eventos/r2020" class="nav-item sub <?= str_contains($_SERVER['REQUEST_URI'], 'r2020') ? 'active' : '' ?>">
             <i class="bi bi-arrow-right-short"></i> R-2020 Serv. Prestados
+        </a>
+        <a href="/eventos/r2055" class="nav-item sub <?= str_contains($_SERVER['REQUEST_URI'], 'r2055') ? 'active' : '' ?>">
+            <i class="bi bi-arrow-right-short"></i> R-2055 Aq. Prod. Rural
         </a>
         <a href="/eventos/r2060" class="nav-item sub <?= str_contains($_SERVER['REQUEST_URI'], 'r2060') ? 'active' : '' ?>">
             <i class="bi bi-arrow-right-short"></i> R-2060 CPRB

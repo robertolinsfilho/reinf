@@ -61,11 +61,13 @@ class CertificadoController extends BaseController
         }
 
         $file = $_FILES['certificado'];
-        $ext  = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
-
-        if (!in_array($ext, ['pfx', 'p12'], true)) {
-            $this->redirect('/certificados', 'Apenas .pfx ou .p12.', 'erro');
+        try {
+            $this->assertUploadedFile($file, 5 * 1024 * 1024, ['pfx', 'p12']);
+        } catch (\RuntimeException $e) {
+            $this->redirect('/certificados', $e->getMessage(), 'erro');
         }
+
+        $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
 
         $meusContribuintes = $this->contribuintes->listByUser($uid);
         if (empty($meusContribuintes)) {

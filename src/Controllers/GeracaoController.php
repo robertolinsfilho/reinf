@@ -35,7 +35,7 @@ class GeracaoController extends BaseController
                 'competencias'       => $this->competencias->listByUser($this->userId()),
                 'eventosDisponiveis' => [],
                 'arquivosGerados'    => [],
-                'recibosR4020'       => [],
+                'recibosSalvos'      => [],
                 'certInfo'           => (new AssinaturaService($this->userId()))->infoCertificado(),
                 'flash'              => $this->getFlash(),
             ]);
@@ -48,7 +48,7 @@ class GeracaoController extends BaseController
         }
 
         $disponiveis = ['R1000' => true, 'R1070' => true];
-        foreach (['R2010'=>'r2010','R2020'=>'r2020','R2060'=>'r2060','R4010'=>'r4010','R4020'=>'r4020'] as $evt => $tab) {
+        foreach (['R2010'=>'r2010','R2020'=>'r2020','R2055'=>'r2055','R2060'=>'r2060','R4010'=>'r4010','R4020'=>'r4020'] as $evt => $tab) {
             $disponiveis[$evt] = $this->eventos->contar($tab, $compId) > 0;
         }
 
@@ -58,7 +58,7 @@ class GeracaoController extends BaseController
             'competencias'       => [],
             'eventosDisponiveis' => $disponiveis,
             'arquivosGerados'    => $this->arquivos->listByCompetenciaForUser($compId, $this->userId()),
-            'recibosR4020'       => $this->arquivos->listRecibosR4020($compId),
+            'recibosSalvos'      => $this->arquivos->listRecibos($compId, null, $this->userId()),
             'certInfo'           => (new AssinaturaService($this->userId()))->infoCertificado(),
             'flash'              => $this->getFlash(),
         ]);
@@ -79,8 +79,21 @@ class GeracaoController extends BaseController
             $this->redirect($url, 'Selecione ao menos um evento.', 'erro');
         }
 
-        $temR4020 = in_array('R4020', $selecionados, true);
-        $recibosSalvos = $temR4020 ? $this->arquivos->listRecibosR4020($compId) : [];
+        if ($nrRecibo !== null && !preg_match('/^[A-Za-z0-9.\\-\/]{1,52}$/', $nrRecibo)) {
+            $this->redirect($url, 'Número de recibo inválido.', 'erro');
+        }
+
+        $recibosSalvos = [];
+        $uid = $this->userId();
+        if (in_array('R4020', $selecionados, true)) {
+            $recibosSalvos = array_merge($recibosSalvos, $this->arquivos->listRecibos($compId, 'R4020', $uid));
+        }
+        if (in_array('R2010', $selecionados, true)) {
+            $recibosSalvos = array_merge($recibosSalvos, $this->arquivos->listRecibos($compId, 'R2010', $uid));
+        }
+        if (in_array('R2055', $selecionados, true)) {
+            $recibosSalvos = array_merge($recibosSalvos, $this->arquivos->listRecibos($compId, 'R2055', $uid));
+        }
 
         if ($indRetif === 2 && !$nrRecibo && empty($recibosSalvos)) {
             $this->redirect($url, 'Retificação exige o número do recibo original (informe ou consulte o protocolo antes).', 'erro');

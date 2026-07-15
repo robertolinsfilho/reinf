@@ -140,15 +140,35 @@ class ArquivoGeradoRepository extends Repository
 
     public function listRecibosR4020(int $competenciaId): array
     {
-        return $this->query(
-            "SELECT id, nome_arquivo, id_evento, nr_recibo_retornado, protocolo, created_at, xml_conteudo
-             FROM arquivos_gerados
-             WHERE competencia_id = ?
-               AND evento = 'R4020'
-               AND nr_recibo_retornado IS NOT NULL
-               AND nr_recibo_retornado <> ''
-             ORDER BY created_at DESC",
-            [$competenciaId]
-        );
+        return $this->listRecibos($competenciaId, 'R4020');
+    }
+
+    public function listRecibos(int $competenciaId, ?string $evento = null, ?int $userId = null): array
+    {
+        $sql = "SELECT a.id, a.evento, a.nome_arquivo, a.id_evento, a.nr_recibo_retornado, a.protocolo, a.created_at, a.xml_conteudo
+                FROM arquivos_gerados a";
+        $params = [];
+
+        if ($userId !== null) {
+            $sql .= " JOIN competencias c ON c.id = a.competencia_id
+                      JOIN contribuintes co ON co.id = c.contribuinte_id
+                      WHERE a.competencia_id = ? AND co.usuario_id = ?";
+            $params = [$competenciaId, $userId];
+        } else {
+            $sql .= ' WHERE a.competencia_id = ?';
+            $params = [$competenciaId];
+        }
+
+        $sql .= " AND a.nr_recibo_retornado IS NOT NULL
+                  AND a.nr_recibo_retornado <> ''";
+
+        if ($evento !== null && $evento !== '') {
+            $sql .= ' AND a.evento = ?';
+            $params[] = $evento;
+        }
+
+        $sql .= ' ORDER BY a.created_at DESC';
+
+        return $this->query($sql, $params);
     }
 }

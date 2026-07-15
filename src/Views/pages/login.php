@@ -4,18 +4,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login – EFD REINF</title>
+    <title>Login – STHEPSON</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.11.3/font/bootstrap-icons.min.css">
-    <link rel="stylesheet" href="/css/app.css">
+<link rel="stylesheet" href="/css/app.css?v=3">
 </head>
 <body>
 <div class="login-wrapper">
     <div class="login-card">
         <div class="login-logo">
-            <i class="bi bi-receipt-cutoff"></i>
-            <h4>EFD REINF</h4>
-            <p>Sistema de Geração e Gestão</p>
+            <img src="/img/logo-sthepson.png?v=3" alt="STHEPSON" class="login-brand-logo"
+                 width="180" height="45" style="width:180px;height:auto;max-width:100%;display:block;margin:0 auto 10px;">
+            <p>EFD-Reinf · Geração e Gestão</p>
         </div>
 
         <?php if ($flash): ?>

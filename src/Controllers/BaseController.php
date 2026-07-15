@@ -71,6 +71,16 @@ abstract class BaseController
         if (!$this->isLoggedIn()) {
             $this->redirect('/login');
         }
+
+        // Obrigar troca de senha (exceto na própria tela de perfil)
+        $uri = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH) ?: '';
+        if (
+            !empty($_SESSION['usuario']['force_password_change'])
+            && !str_starts_with($uri, '/perfil')
+            && $uri !== '/logout'
+        ) {
+            $this->redirect('/perfil', 'Por segurança, defina uma nova senha antes de continuar.', 'erro');
+        }
     }
 
     protected function requireAdmin(): void
@@ -142,10 +152,30 @@ abstract class BaseController
         } catch (\PDOException $e) {
             error_log('DB Error: ' . $e->getMessage());
             $this->redirect($redirectUrl, "{$errorPrefix}: falha ao gravar dados.", 'erro');
+        } catch (\RuntimeException $e) {
+            // Mensagens de negócio controladas (importação, validação etc.)
+            error_log('Runtime: ' . $e->getMessage());
+            $this->redirect($redirectUrl, "{$errorPrefix}: " . $e->getMessage(), 'erro');
         } catch (\Exception $e) {
             error_log('Error: ' . $e->getMessage());
-            $this->redirect($redirectUrl, "{$errorPrefix}: " . $e->getMessage(), 'erro');
+            $this->redirect($redirectUrl, "{$errorPrefix}: não foi possível concluir a operação.", 'erro');
         }
+    }
+
+    protected function assertUploadedFile(array $file, int $maxSize, array $allowedExt): string
+    {
+        if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+            throw new \RuntimeException('Falha no upload do arquivo.');
+        }
+        if (($file['size'] ?? 0) <= 0 || ($file['size'] ?? 0) > $maxSize) {
+            $mb = (int) round($maxSize / 1024 / 1024);
+            throw new \RuntimeException("Arquivo excede o tamanho máximo de {$mb}MB.");
+        }
+        $ext = strtolower(pathinfo((string) ($file['name'] ?? ''), PATHINFO_EXTENSION));
+        if (!in_array($ext, $allowedExt, true)) {
+            throw new \RuntimeException('Tipo de arquivo não permitido.');
+        }
+        return $ext;
     }
 
     // ─── Input helpers ───────────────────────────────────────

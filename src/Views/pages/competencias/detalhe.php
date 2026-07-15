@@ -32,6 +32,7 @@
 <div class="row g-2 mb-3">
     <div class="col"><div class="card p-3 text-center"><small class="text-muted d-block">R-2010</small><strong><?= number_format($r2010_total ?? 0, 0, ',', '.') ?></strong></div></div>
     <div class="col"><div class="card p-3 text-center"><small class="text-muted d-block">R-2020</small><strong><?= number_format($r2020_total ?? 0, 0, ',', '.') ?></strong></div></div>
+    <div class="col"><div class="card p-3 text-center"><small class="text-muted d-block">R-2055</small><strong><?= number_format($r2055_total ?? 0, 0, ',', '.') ?></strong></div></div>
     <div class="col"><div class="card p-3 text-center"><small class="text-muted d-block">R-2060</small><strong><?= number_format($r2060_total ?? 0, 0, ',', '.') ?></strong></div></div>
     <div class="col"><div class="card p-3 text-center"><small class="text-muted d-block">R-4010</small><strong><?= number_format($r4010_total ?? 0, 0, ',', '.') ?></strong></div></div>
     <div class="col"><div class="card p-3 text-center"><small class="text-muted d-block">R-4020</small><strong><?= number_format($r4020_total ?? 0, 0, ',', '.') ?></strong></div></div>
@@ -47,6 +48,11 @@
     <li class="nav-item">
         <a class="nav-link" data-bs-toggle="tab" href="#tab-r2020">
             R-2020 <span class="badge bg-secondary ms-1"><?= number_format($r2020_total ?? 0, 0, ',', '.') ?></span>
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link" data-bs-toggle="tab" href="#tab-r2055">
+            R-2055 <span class="badge bg-secondary ms-1"><?= number_format($r2055_total ?? 0, 0, ',', '.') ?></span>
         </a>
     </li>
     <li class="nav-item">
@@ -143,6 +149,49 @@
                             <td class="small"><?= htmlspecialchars($r['num_documento'] ?? '') ?></td>
                             <td class="text-end small">R$ <?= number_format($r['valor_bruto'], 2, ',', '.') ?></td>
                             <td class="text-end small text-danger">R$ <?= number_format($r['valor_retencao'], 2, ',', '.') ?></td>
+                        </tr>
+                        <?php endforeach; endif; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- R-2055 -->
+    <div class="tab-pane" id="tab-r2055">
+        <div class="card border-top-0 rounded-0 rounded-bottom">
+            <div class="card-body p-0">
+                <div class="d-flex justify-content-between align-items-center p-2">
+                    <div>
+                        <?php if (($r2055_pages ?? 1) > 1): ?>
+                        <div class="btn-group btn-group-sm">
+                            <?php if ($r2055_page > 1): ?>
+                            <a href="?id=<?= $competencia['id'] ?>&page_r2055=<?= $r2055_page - 1 ?>#tab-r2055" class="btn btn-outline-secondary"><i class="bi bi-chevron-left"></i></a>
+                            <?php endif; ?>
+                            <span class="btn btn-outline-secondary disabled">Pág <?= $r2055_page ?>/<?= $r2055_pages ?></span>
+                            <?php if ($r2055_page < $r2055_pages): ?>
+                            <a href="?id=<?= $competencia['id'] ?>&page_r2055=<?= $r2055_page + 1 ?>#tab-r2055" class="btn btn-outline-secondary"><i class="bi bi-chevron-right"></i></a>
+                            <?php endif; ?>
+                        </div>
+                        <?php endif; ?>
+                    </div>
+                    <a href="/eventos/r2055?competencia_id=<?= $competencia['id'] ?>" class="btn btn-sm btn-outline-primary">
+                        <i class="bi bi-pencil me-1"></i> Gerenciar R-2055
+                    </a>
+                </div>
+                <table class="table table-sm table-hover mb-0">
+                    <thead><tr><th>Adquirente</th><th>Produtor</th><th>indAquis</th><th class="text-end">Bruto</th><th class="text-end">CP</th><th class="text-end">SENAR</th></tr></thead>
+                    <tbody>
+                        <?php if (empty($r2055)): ?>
+                        <tr><td colspan="6" class="text-center text-muted py-3">Nenhum registro.</td></tr>
+                        <?php else: foreach ($r2055 as $r): ?>
+                        <tr>
+                            <td class="font-monospace small"><?= htmlspecialchars($r['nr_insc_adquirente']) ?></td>
+                            <td class="font-monospace small"><?= htmlspecialchars($r['nr_insc_produtor']) ?></td>
+                            <td class="small"><?= htmlspecialchars($r['ind_aquis']) ?></td>
+                            <td class="text-end small">R$ <?= number_format((float) $r['valor_bruto'], 2, ',', '.') ?></td>
+                            <td class="text-end small">R$ <?= number_format((float) $r['valor_cp_desc'], 2, ',', '.') ?></td>
+                            <td class="text-end small">R$ <?= number_format((float) $r['valor_senar_desc'], 2, ',', '.') ?></td>
                         </tr>
                         <?php endforeach; endif; ?>
                     </tbody>

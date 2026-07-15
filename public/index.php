@@ -18,7 +18,20 @@ ini_set('session.cookie_samesite', 'Lax');
 
 $config = \App\Models\AppConfig::get();
 
-if (($config['app']['env'] ?? '') === 'production') {
+$appEnv = (string) ($config['app']['env'] ?? 'production');
+$secret = (string) ($config['app']['secret'] ?? '');
+if ($appEnv === 'production' && \App\Services\CertificadoCrypto::isInsecureSecret($secret)) {
+    http_response_code(500);
+    header('Content-Type: text/plain; charset=utf-8');
+    echo "Configuração insegura: defina APP_SECRET forte (≥32 caracteres) no .env antes de usar em production.\n";
+    echo "Gere com: php -r \"echo bin2hex(random_bytes(32)), PHP_EOL;\"\n";
+    exit(1);
+}
+if (\App\Services\CertificadoCrypto::isInsecureSecret($secret)) {
+    error_log('WARNING: APP_SECRET ausente ou fraco. Defina um valor forte no .env.');
+}
+
+if ($appEnv === 'production') {
     ini_set('session.cookie_secure', '1');
 }
 
@@ -52,6 +65,7 @@ $routes = [
         '/eventos'               => ['App\\Controllers\\EventoController', 'index'],
         '/eventos/r2010'         => ['App\\Controllers\\EventoController', 'r2010'],
         '/eventos/r2020'         => ['App\\Controllers\\EventoController', 'r2020'],
+        '/eventos/r2055'         => ['App\\Controllers\\EventoController', 'r2055'],
         '/eventos/r2060'         => ['App\\Controllers\\EventoController', 'r2060'],
 
         // Eventos R-4000
@@ -87,9 +101,11 @@ $routes = [
         // Eventos R-2000
         '/eventos/r2010/salvar'     => ['App\\Controllers\\EventoController', 'salvarR2010'],
         '/eventos/r2020/salvar'     => ['App\\Controllers\\EventoController', 'salvarR2020'],
+        '/eventos/r2055/salvar'     => ['App\\Controllers\\EventoController', 'salvarR2055'],
         '/eventos/r2060/salvar'     => ['App\\Controllers\\EventoController', 'salvarR2060'],
         '/eventos/r2010/excluir'    => ['App\\Controllers\\EventoController', 'excluirR2010'],
         '/eventos/r2020/excluir'    => ['App\\Controllers\\EventoController', 'excluirR2020'],
+        '/eventos/r2055/excluir'    => ['App\\Controllers\\EventoController', 'excluirR2055'],
         '/eventos/r2060/excluir'    => ['App\\Controllers\\EventoController', 'excluirR2060'],
 
         // Eventos R-4000

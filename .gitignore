@@ -9,6 +9,8 @@
 !/storage/uploads/.gitkeep
 !/storage/xml/.gitkeep
 !/storage/xsd/.gitkeep
+/storage/rate_limit/*
+!/storage/rate_limit/.gitkeep
 *.pfx
 *.p12
 *.log

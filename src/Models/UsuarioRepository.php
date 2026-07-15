@@ -35,6 +35,7 @@ class UsuarioRepository extends Repository
         $data = ['nome' => $nome];
         if ($senhaHash) {
             $data['senha'] = $senhaHash;
+            $data['force_password_change'] = 0;
         }
         $this->update($id, $data);
     }

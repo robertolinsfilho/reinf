@@ -29,11 +29,15 @@
                         <input type="text" name="razao_social_prestador" class="form-control" placeholder="Nome do prestador">
                     </div>
                     <div class="row g-2 mb-2">
-                        <div class="col-6">
+                        <div class="col-4">
+                            <label class="form-label">Série</label>
+                            <input type="text" name="serie" class="form-control" placeholder="0" maxlength="5">
+                        </div>
+                        <div class="col-4">
                             <label class="form-label">Nº Documento</label>
                             <input type="text" name="num_documento" class="form-control">
                         </div>
-                        <div class="col-6">
+                        <div class="col-4">
                             <label class="form-label">Data Emissão</label>
                             <input type="date" name="data_emissao" class="form-control">
                         </div>
@@ -44,20 +48,40 @@
                             <input type="text" name="valor_bruto" class="form-control text-end" placeholder="0,00" required>
                         </div>
                         <div class="col-4">
-                            <label class="form-label">Retenção</label>
-                            <input type="text" name="valor_retencao" class="form-control text-end" placeholder="0,00">
+                            <label class="form-label">Base Retenção</label>
+                            <input type="text" name="valor_base_retencao" class="form-control text-end" placeholder="= bruto">
                         </div>
                         <div class="col-4">
+                            <label class="form-label">Retenção</label>
+                            <input type="text" name="valor_retencao" class="form-control text-end" placeholder="11% / 3,5%">
+                        </div>
+                    </div>
+                    <div class="row g-2 mb-2">
+                        <div class="col-6">
+                            <label class="form-label">Tipo Serviço (Tab. 6)</label>
+                            <input type="text" name="cod_servico" class="form-control font-monospace" placeholder="100000001" maxlength="9">
+                            <div class="form-text">Código de 9 dígitos. Padrão: 100000001.</div>
+                        </div>
+                        <div class="col-6">
                             <label class="form-label">SENAR</label>
                             <input type="text" name="valor_desc_senar" class="form-control text-end" placeholder="0,00">
                         </div>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label">Tipo Inscrição</label>
-                        <select name="tipo_insc_prestador" class="form-select form-select-sm">
-                            <option value="1">1 – CNPJ</option>
-                            <option value="2">2 – CPF</option>
-                        </select>
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <label class="form-label">Tipo Inscrição</label>
+                            <select name="tipo_insc_prestador" class="form-select form-select-sm">
+                                <option value="1">1 – CNPJ</option>
+                                <option value="2">2 – CPF</option>
+                            </select>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">indCPRB</label>
+                            <select name="ind_cprb" class="form-select form-select-sm">
+                                <option value="0">0 – Não (retenção 11%)</option>
+                                <option value="1">1 – Sim (retenção 3,5%)</option>
+                            </select>
+                        </div>
                     </div>
                     <button type="submit" class="btn btn-primary w-100">
                         <i class="bi bi-plus-lg me-1"></i> Adicionar Registro
@@ -75,26 +99,37 @@
             <div class="table-responsive">
                 <table class="table table-sm table-hover mb-0">
                     <thead>
-                        <tr><th>CNPJ/CPF</th><th>Prestador</th><th>Doc.</th><th class="text-end">Bruto</th><th class="text-end">Retenção</th></tr>
+                        <tr>
+                            <th>CNPJ/CPF</th>
+                            <th>Prestador</th>
+                            <th>Doc.</th>
+                            <th>Tab.6</th>
+                            <th class="text-end">Bruto</th>
+                            <th class="text-end">Base</th>
+                            <th class="text-end">Retenção</th>
+                        </tr>
                     </thead>
                     <tbody>
                         <?php if (empty($registros)): ?>
-                        <tr><td colspan="5" class="text-center text-muted py-4">Nenhum registro. Adicione manualmente ou <a href="/importar">importe pelo Excel</a>.</td></tr>
+                        <tr><td colspan="7" class="text-center text-muted py-4">Nenhum registro. Adicione manualmente ou <a href="/importar">importe pelo Excel</a>.</td></tr>
                         <?php else: foreach ($registros as $r): ?>
                         <tr>
                             <td class="font-monospace small"><?= $r['cnpj_prestador'] ?></td>
                             <td style="font-size:.82rem"><?= htmlspecialchars($r['razao_social_prestador'] ?? '') ?></td>
                             <td class="small"><?= htmlspecialchars($r['num_documento'] ?? '') ?></td>
-                            <td class="text-end small">R$ <?= number_format($r['valor_bruto'], 2, ',', '.') ?></td>
-                            <td class="text-end small text-danger">R$ <?= number_format($r['valor_retencao'], 2, ',', '.') ?></td>
+                            <td class="font-monospace small"><?= htmlspecialchars($r['cod_servico'] ?: '100000001') ?></td>
+                            <td class="text-end small">R$ <?= number_format((float) $r['valor_bruto'], 2, ',', '.') ?></td>
+                            <td class="text-end small">R$ <?= number_format((float) (($r['valor_base_retencao'] ?? 0) ?: $r['valor_bruto']), 2, ',', '.') ?></td>
+                            <td class="text-end small text-danger">R$ <?= number_format((float) $r['valor_retencao'], 2, ',', '.') ?></td>
                         </tr>
                         <?php endforeach; endif; ?>
                     </tbody>
                     <?php if (!empty($registros)): ?>
                     <tfoot class="table-light fw-bold">
                         <tr>
-                            <td colspan="3" class="text-end small">Total:</td>
+                            <td colspan="4" class="text-end small">Total:</td>
                             <td class="text-end small">R$ <?= number_format(array_sum(array_column($registros,'valor_bruto')), 2, ',', '.') ?></td>
+                            <td class="text-end small">R$ <?= number_format(array_sum(array_map(fn($r) => (float) (($r['valor_base_retencao'] ?? 0) ?: $r['valor_bruto']), $registros)), 2, ',', '.') ?></td>
                             <td class="text-end small text-danger">R$ <?= number_format(array_sum(array_column($registros,'valor_retencao')), 2, ',', '.') ?></td>
                         </tr>
                     </tfoot>

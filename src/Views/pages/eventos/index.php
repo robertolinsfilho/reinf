@@ -24,7 +24,7 @@ foreach ($eventos as [$cod, $nome, $cor, $desc]): ?>
             <h6 class="card-title"><?= $nome ?></h6>
             <p class="card-text text-muted small"><?= $desc ?></p>
         </div>
-        <?php if (in_array($cod, ['R-2010','R-2020','R-2060'])): ?>
+        <?php if (in_array($cod, ['R-2010','R-2020','R-2055','R-2060'])): ?>
         <div class="card-footer bg-transparent border-0">
             <a href="/eventos/<?= strtolower(str_replace('-','', $cod)) ?>?competencia_id=" class="btn btn-sm btn-outline-<?= $cor ?>">
                 Acessar →

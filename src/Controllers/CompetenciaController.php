@@ -58,7 +58,7 @@ class CompetenciaController extends BaseController
         $eventoRepo = new EventoRepository($this->db);
         $eventos = [];
 
-        foreach (['r2010', 'r2020', 'r2060', 'r4010', 'r4020'] as $tab) {
+        foreach (['r2010', 'r2020', 'r2055', 'r2060', 'r4010', 'r4020'] as $tab) {
             $page   = max(1, (int) $this->get("page_{$tab}", 1));
             $offset = ($page - 1) * $limit;
             $total  = $eventoRepo->contar($tab, $id);

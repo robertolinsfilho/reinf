@@ -88,6 +88,19 @@ class TransmissaoController extends BaseController
         $service       = new TransmissaoService($this->db, $uid);
         $certAtivo     = $this->certificados->findAtivoByUser($uid);
         $temCertValido = $certAtivo && strtotime($certAtivo['validade']) > time();
+        $tpAmb         = (int) ($this->config['reinf']['tp_amb'] ?? 2);
+        $allowSim      = !empty($this->config['security']['allow_simulated_transmission']);
+        $isProduction  = ($this->config['app']['env'] ?? '') === 'production' || $tpAmb === 1;
+
+        if (!$temCertValido) {
+            if ($isProduction || !$allowSim) {
+                $this->redirect(
+                    $url,
+                    'Certificado A1 válido obrigatório para transmitir. Envio simulado está desabilitado.',
+                    'erro'
+                );
+            }
+        }
 
         $resultado = $temCertValido
             ? $service->enviarLote($comp['cnpj'], $xmls, assinar: true)
@@ -99,29 +112,20 @@ class TransmissaoController extends BaseController
 
         if ($resultado['sucesso']) {
             $protocolo = $resultado['protocolo'] ?? '';
-            $this->competencias->marcarTransmitido($compId, $protocolo);
             $this->arquivos->marcarProtocolo(array_map(fn($a) => (int) $a['id'], $arquivos), $protocolo);
 
-            // Simulação: gera recibo por arquivo imediatamente
             if (!empty($resultado['simulado'])) {
-                $porId = [];
-                $ordem = [];
-                foreach ($arquivos as $i => $arq) {
-                    $recibo = 'SIM-REC-' . date('YmdHis') . '-' . sprintf('%03d', $i);
-                    $ordem[] = $recibo;
-                    if (!empty($arq['id_evento'])) {
-                        $porId[$arq['id_evento']] = $recibo;
-                    } elseif (!empty($arq['xml_conteudo']) && preg_match('/\bid="(ID[^"]+)"/', $arq['xml_conteudo'], $m)) {
-                        $porId[$m[1]] = $recibo;
-                        $this->arquivos->update((int) $arq['id'], ['id_evento' => $m[1]]);
-                    }
-                }
-                $this->arquivos->aplicarRecibos($compId, $protocolo, $porId, $ordem);
+                // Simulação: NÃO marca competência como transmitido (evita falso compliance)
+                $msg = 'Simulação concluída (não oficial). Protocolo fictício: ' . ($protocolo ?: '—')
+                     . '. Cadastre um certificado válido para transmissão real.';
+                $this->redirect($url, $msg, 'sucesso');
             }
+
+            $this->competencias->marcarTransmitido($compId, $protocolo);
         }
 
-        $sim = !empty($resultado['simulado']) ? ' (simulação)' : '';
-        $msg = ($resultado['sucesso'] ? 'Enviado com sucesso' : 'Falha') . $sim . '. Protocolo: ' . ($resultado['protocolo'] ?? '—');
+        $msg = ($resultado['sucesso'] ? 'Enviado com sucesso' : 'Falha')
+             . '. Protocolo: ' . ($resultado['protocolo'] ?? '—');
         $this->redirect($url, $msg, $resultado['sucesso'] ? 'sucesso' : 'erro');
     }
 

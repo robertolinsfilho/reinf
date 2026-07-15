@@ -19,30 +19,34 @@ services:
     environment:
       - DB_HOST=db
       - DB_PORT=3306
-      - DB_NAME=efd_reinf
-      - DB_USER=reinf_user
-      - DB_PASS=reinf_pass123
-      - APP_ENV=${APP_ENV:-production}
+      - DB_NAME=${DB_NAME:-efd_reinf}
+      - DB_USER=${DB_USER:-reinf_user}
+      - DB_PASS=${DB_PASS:-reinf_pass123}
+      - APP_ENV=${APP_ENV:-local}
       - APP_URL=${APP_URL:-http://localhost}
+      - APP_SECRET=${APP_SECRET:-}
+      - REINF_TP_AMB=${REINF_TP_AMB:-2}
+      - ALLOW_SIMULATED_TRANSMISSION=${ALLOW_SIMULATED_TRANSMISSION:-0}
 
   db:
     image: mysql:8.0
     container_name: efd_reinf_db
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: root_pass123
-      MYSQL_DATABASE: efd_reinf
-      MYSQL_USER: reinf_user
-      MYSQL_PASSWORD: reinf_pass123
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root_pass123}
+      MYSQL_DATABASE: ${DB_NAME:-efd_reinf}
+      MYSQL_USER: ${DB_USER:-reinf_user}
+      MYSQL_PASSWORD: ${DB_PASS:-reinf_pass123}
     volumes:
       - db_data:/var/lib/mysql
       - ./database/migrations/init.sql:/docker-entrypoint-initdb.d/init.sql
+    # Apenas localhost — não exponha 3306 na internet
     ports:
-      - "3306:3306"
+      - "127.0.0.1:3306:3306"
     networks:
       - efd_network
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot_pass123"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-root_pass123}"]
       interval: 5s
       timeout: 5s
       retries: 20
@@ -61,17 +65,20 @@ services:
     depends_on:
       - app
 
+  # Só sobe com: docker compose --profile tools up -d
+  # e fica restrito a localhost
   phpmyadmin:
+    profiles: ["tools"]
     image: phpmyadmin/phpmyadmin
     container_name: efd_reinf_pma
     restart: unless-stopped
     environment:
       PMA_HOST: db
-      PMA_USER: reinf_user
-      PMA_PASSWORD: reinf_pass123
+      PMA_USER: ${DB_USER:-reinf_user}
+      PMA_PASSWORD: ${DB_PASS:-reinf_pass123}
       UPLOAD_LIMIT: 100M
     ports:
-      - "8080:80"
+      - "127.0.0.1:8080:80"
     networks:
       - efd_network
     depends_on:

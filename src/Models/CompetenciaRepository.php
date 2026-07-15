@@ -22,6 +22,7 @@ class CompetenciaRepository extends Repository
             SELECT c.*, co.razao_social, co.cnpj,
                 (SELECT COUNT(*) FROM r2010 WHERE competencia_id = c.id) as total_r2010,
                 (SELECT COUNT(*) FROM r2020 WHERE competencia_id = c.id) as total_r2020,
+                (SELECT COUNT(*) FROM r2055 WHERE competencia_id = c.id) as total_r2055,
                 (SELECT COUNT(*) FROM r2060 WHERE competencia_id = c.id) as total_r2060,
                 (SELECT COUNT(*) FROM r4010 WHERE competencia_id = c.id) as total_r4010,
                 (SELECT COUNT(*) FROM r4020 WHERE competencia_id = c.id) as total_r4020
@@ -46,6 +47,34 @@ class CompetenciaRepository extends Repository
             "SELECT id FROM competencias WHERE contribuinte_id = ? AND periodo = ?",
             [$contribuinteId, $periodo]
         );
+    }
+
+    /**
+     * Retorna id da competência; cria se ainda não existir.
+     */
+    public function findOrCreate(int $contribuinteId, string $periodo): array
+    {
+        $periodo = substr(trim($periodo), 0, 7);
+        if (!preg_match('/^\d{4}-\d{2}$/', $periodo)) {
+            throw new \InvalidArgumentException("Período inválido: {$periodo}");
+        }
+
+        $existente = $this->queryOne(
+            "SELECT * FROM competencias WHERE contribuinte_id = ? AND periodo = ?",
+            [$contribuinteId, $periodo]
+        );
+        if ($existente) {
+            return ['competencia' => $existente, 'criada' => false];
+        }
+
+        $id = $this->insert([
+            'contribuinte_id' => $contribuinteId,
+            'periodo'         => $periodo,
+            'status'          => 'aberto',
+        ]);
+
+        $nova = $this->find($id);
+        return ['competencia' => $nova, 'criada' => true];
     }
 
     public function marcarTransmitido(int $id, string $protocolo): void

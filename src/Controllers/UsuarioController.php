@@ -78,9 +78,19 @@ class UsuarioController extends BaseController
         }
 
         $hash = $senha ? password_hash($senha, PASSWORD_BCRYPT) : null;
+        if (!empty($_SESSION['usuario']['force_password_change']) && !$hash) {
+            $this->redirect('/perfil', 'Informe a nova senha para continuar.', 'erro');
+        }
+        if ($hash && strlen($senha) < 8) {
+            $this->redirect('/perfil', 'A nova senha deve ter pelo menos 8 caracteres.', 'erro');
+        }
+
         $this->repo->atualizarPerfil($this->userId(), $nome, $hash);
 
         $_SESSION['usuario']['nome'] = $nome;
-        $this->redirect('/perfil', 'Perfil atualizado!', 'sucesso');
+        if ($hash) {
+            $_SESSION['usuario']['force_password_change'] = false;
+        }
+        $this->redirect($hash ? '/dashboard' : '/perfil', 'Perfil atualizado!', 'sucesso');
     }
 }

@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS usuarios (
     senha VARCHAR(255) NOT NULL,
     perfil ENUM('admin','usuario') DEFAULT 'usuario',
     ativo TINYINT(1) DEFAULT 1,
+    force_password_change TINYINT(1) NOT NULL DEFAULT 0,
     trial_expira DATE NULL,
     ultimo_acesso DATETIME NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -98,8 +99,29 @@ CREATE TABLE IF NOT EXISTS r2010 (
     valor_desc_senar DECIMAL(15,2) DEFAULT 0.00,
     cod_servico VARCHAR(10),
     tp_servico TINYINT,
+    ind_cprb TINYINT NOT NULL DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (competencia_id) REFERENCES competencias(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- ─── R-2055 ──────────────────────────────────
+CREATE TABLE IF NOT EXISTS r2055 (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    competencia_id INT NOT NULL,
+    tp_insc_adquirente ENUM('1','3') NOT NULL DEFAULT '1',
+    nr_insc_adquirente VARCHAR(14) NOT NULL,
+    tp_insc_produtor ENUM('1','2') NOT NULL DEFAULT '1',
+    nr_insc_produtor VARCHAR(14) NOT NULL,
+    ind_opc_cp CHAR(1) NULL COMMENT 'S = opção folha; NULL = comercialização',
+    ind_aquis CHAR(1) NOT NULL DEFAULT '1',
+    valor_bruto DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+    valor_cp_desc DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+    valor_rat_desc DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+    valor_senar_desc DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (competencia_id) REFERENCES competencias(id) ON DELETE CASCADE,
+    INDEX idx_r2055_comp (competencia_id),
+    INDEX idx_r2055_prod (nr_insc_produtor)
 ) ENGINE=InnoDB;
 
 -- ─── R-2020 ──────────────────────────────────
@@ -278,11 +300,12 @@ CREATE TABLE IF NOT EXISTS arquivos_gerados (
 -- SEEDS
 -- ============================================
 
--- Admin (senha: admin123)
-INSERT INTO usuarios (nome, email, senha, perfil, ativo) VALUES
+-- Admin inicial: troque a senha no primeiro login (force_password_change=1).
+-- NÃO use esta conta em produção sem alterar a senha.
+INSERT INTO usuarios (nome, email, senha, perfil, ativo, force_password_change) VALUES
 ('Administrador', 'admin@efdreinf.com.br',
  '$2y$10$i7YbP/ylBPLklB6sh..fqO.kHgA7o8vKHVinZOa9fvbnmAqSzT5Oi',
- 'admin', 1);
+ 'admin', 1, 1);
 
 -- Tabela 01 - Naturezas PF (R-4010)
 INSERT IGNORE INTO naturezas_rendimento (codigo, descricao, aplicavel_pf, aplicavel_pj, grupo, tabela_origem) VALUES

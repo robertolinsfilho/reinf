@@ -22,6 +22,18 @@ class ContribuinteRepository extends Repository
         );
     }
 
+    public function findByCnpjAndUser(string $cnpj, int $userId): ?array
+    {
+        $cnpj = preg_replace('/\D/', '', $cnpj) ?? '';
+        if ($cnpj === '') {
+            return null;
+        }
+        return $this->queryOne(
+            "SELECT * FROM contribuintes WHERE usuario_id = ? AND cnpj = ? LIMIT 1",
+            [$userId, $cnpj]
+        );
+    }
+
     public function criar(int $userId, array $dados): int
     {
         return $this->insert(['usuario_id' => $userId, ...$dados]);

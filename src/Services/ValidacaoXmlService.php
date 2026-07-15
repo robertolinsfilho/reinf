@@ -17,6 +17,7 @@ class ValidacaoXmlService
         'R1070' => 'evtTabProcesso',
         'R2010' => 'evtServTom',
         'R2020' => 'evtServPrest',
+        'R2055' => 'evtAqProd',
         'R2060' => 'evtCPRB',
         'R2099' => 'evtFechamento',
         'R4010' => 'evtRetPF',
