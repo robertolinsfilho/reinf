@@ -60,10 +60,10 @@
             <div class="card-header">Registros <span class="badge bg-secondary ms-1"><?= count($registros) ?></span></div>
             <div class="table-responsive">
                 <table class="table table-sm table-hover mb-0">
-                    <thead><tr><th>CNPJ/CPF</th><th>Tomador</th><th>Doc.</th><th class="text-end">Bruto</th><th class="text-end">Retenção</th></tr></thead>
+                    <thead><tr><th>CNPJ/CPF</th><th>Tomador</th><th>Doc.</th><th class="text-end">Bruto</th><th class="text-end">Retenção</th><th></th></tr></thead>
                     <tbody>
                         <?php if (empty($registros)): ?>
-                        <tr><td colspan="5" class="text-center text-muted py-4">Sem registros.</td></tr>
+                        <tr><td colspan="6" class="text-center text-muted py-4">Sem registros.</td></tr>
                         <?php else: foreach ($registros as $r): ?>
                         <tr>
                             <td class="font-monospace small"><?= $r['cnpj_tomador'] ?></td>
@@ -71,6 +71,14 @@
                             <td class="small"><?= htmlspecialchars($r['num_documento'] ?? '') ?></td>
                             <td class="text-end small">R$ <?= number_format($r['valor_bruto'], 2, ',', '.') ?></td>
                             <td class="text-end small text-danger">R$ <?= number_format($r['valor_retencao'], 2, ',', '.') ?></td>
+                            <td>
+                                <form action="/eventos/r2020/excluir" method="POST" onsubmit="return confirm('Apagar este registro localmente?')">
+                                    <?= $csrfField ?>
+                                    <input type="hidden" name="id" value="<?= (int) $r['id'] ?>">
+                                    <input type="hidden" name="competencia_id" value="<?= (int) $competencia['id'] ?>">
+                                    <button class="btn btn-outline-danger btn-sm py-0 px-1" title="Apagar local"><i class="bi bi-trash3"></i></button>
+                                </form>
+                            </td>
                         </tr>
                         <?php endforeach; endif; ?>
                     </tbody>

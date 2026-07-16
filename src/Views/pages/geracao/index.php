@@ -229,6 +229,24 @@
                                 <a href="/download?id=<?= $a['id'] ?>" class="btn btn-sm btn-outline-success py-0">
                                     <i class="bi bi-download"></i>
                                 </a>
+                                <?php if (!empty($a['nr_recibo_retornado'])): ?>
+                                <a href="/transmissao?competencia_id=<?= (int) $competencia['id'] ?>"
+                                   class="btn btn-sm btn-outline-danger py-0"
+                                   title="Já transmitido — exclua na RFB via R-9000 na Transmissão">
+                                    <i class="bi bi-trash3"></i>
+                                </a>
+                                <?php else: ?>
+                                <form action="/transmissao/excluir-arquivos" method="POST" class="d-inline"
+                                      onsubmit="return confirm('Apagar este XML localmente?')">
+                                    <?= $csrfField ?>
+                                    <input type="hidden" name="competencia_id" value="<?= (int) $competencia['id'] ?>">
+                                    <input type="hidden" name="voltar" value="gerar">
+                                    <input type="hidden" name="arquivos[]" value="<?= (int) $a['id'] ?>">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger py-0" title="Apagar local">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </form>
+                                <?php endif; ?>
                             </td>
                         </tr>
                         <?php endforeach; endif; ?>
@@ -244,6 +262,7 @@
                     <li>XMLs gerados conforme leiaute EFD-REINF <strong>v2.1.2</strong></li>
                     <li>Ambiente: <strong><?= ($config['reinf']['tp_amb'] ?? 2) === 1 ? 'Produção' : 'Homologação' ?></strong></li>
                     <li>Após gerar, vá para <a href="/transmissao?competencia_id=<?= $competencia['id'] ?>"><strong>Transmissão</strong></a></li>
+                    <li>Apagar XML local: ícone de lixeira nesta lista. Se já tiver recibo, use R-9000 na Transmissão.</li>
                 </ul>
             </div>
         </div>

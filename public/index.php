@@ -121,6 +121,9 @@ $routes = [
         // Transmissão
         '/transmissao/enviar'       => ['App\\Controllers\\TransmissaoController', 'enviar'],
         '/transmissao/consultar'    => ['App\\Controllers\\TransmissaoController', 'consultar'],
+        '/transmissao/excluir-rfb'       => ['App\\Controllers\\TransmissaoController', 'excluirRfb'],
+        '/transmissao/excluir-arquivos'  => ['App\\Controllers\\TransmissaoController', 'excluirArquivos'],
+        '/transmissao/excluir-historico' => ['App\\Controllers\\TransmissaoController', 'excluirHistorico'],
 
         // Certificados
         '/certificados/upload'      => ['App\\Controllers\\CertificadoController', 'upload'],

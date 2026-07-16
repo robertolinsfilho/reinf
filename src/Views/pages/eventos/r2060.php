@@ -69,10 +69,10 @@
             <div class="card-header">Registros <span class="badge bg-secondary ms-1"><?= count($registros) ?></span></div>
             <div class="table-responsive">
                 <table class="table table-sm table-hover mb-0">
-                    <thead><tr><th>CNAE</th><th class="text-end">Rec. Bruta</th><th class="text-end">Excl.</th><th class="text-end">Base</th><th class="text-end">Alíq.</th><th class="text-end">Contrib.</th></tr></thead>
+                    <thead><tr><th>CNAE</th><th class="text-end">Rec. Bruta</th><th class="text-end">Excl.</th><th class="text-end">Base</th><th class="text-end">Alíq.</th><th class="text-end">Contrib.</th><th></th></tr></thead>
                     <tbody>
                         <?php if (empty($registros)): ?>
-                        <tr><td colspan="6" class="text-center text-muted py-4">Sem registros.</td></tr>
+                        <tr><td colspan="7" class="text-center text-muted py-4">Sem registros.</td></tr>
                         <?php else: foreach ($registros as $r): ?>
                         <tr>
                             <td class="font-monospace small"><?= $r['cnae'] ?></td>
@@ -81,6 +81,14 @@
                             <td class="text-end small">R$ <?= number_format($r['valor_base_calculo'], 2, ',', '.') ?></td>
                             <td class="text-end small"><?= $r['aliquota'] ?>%</td>
                             <td class="text-end small text-danger fw-bold">R$ <?= number_format($r['valor_contribuicao'], 2, ',', '.') ?></td>
+                            <td>
+                                <form action="/eventos/r2060/excluir" method="POST" onsubmit="return confirm('Apagar este registro localmente?')">
+                                    <?= $csrfField ?>
+                                    <input type="hidden" name="id" value="<?= (int) $r['id'] ?>">
+                                    <input type="hidden" name="competencia_id" value="<?= (int) $competencia['id'] ?>">
+                                    <button class="btn btn-outline-danger btn-sm py-0 px-1" title="Apagar local"><i class="bi bi-trash3"></i></button>
+                                </form>
+                            </td>
                         </tr>
                         <?php endforeach; endif; ?>
                     </tbody>

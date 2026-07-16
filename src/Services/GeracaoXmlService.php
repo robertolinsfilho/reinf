@@ -759,19 +759,72 @@ class GeracaoXmlService
 
     // ═══ R-9000 ═══════════════════════════════════════
 
-    private function gerarR9000(array $comp): string
+    /**
+     * Gera um R-9000 por evento a excluir (recibo + tipo).
+     *
+     * @param list<array{tp_evento: string, nr_recibo: string, arquivo_id?: int}> $exclusoes
+     * @return list<array{evento: string, nome: string, caminho: string, tamanho: int, hash: string, xml: string, nr_recibo_original: string, exclusao_arquivo_id: ?int}>
+     */
+    public function gerarR9000Exclusoes(array $comp, array $exclusoes): array
+    {
+        $arquivos = [];
+        foreach ($exclusoes as $i => $exc) {
+            $tpEvt = $this->formatarTpEvento((string) ($exc['tp_evento'] ?? ''));
+            $nrRec = preg_replace('/[^A-Za-z0-9.\\-\/]/', '', (string) ($exc['nr_recibo'] ?? '')) ?? '';
+            $nrRec = substr($nrRec, 0, 52);
+            if ($tpEvt === '' || $nrRec === '') {
+                throw new \RuntimeException('R-9000 exige tipo do evento e número do recibo.');
+            }
+
+            $xml = $this->montarXmlR9000($comp, $tpEvt, $nrRec);
+            $arq = $this->salvarXml('R9000', $comp, $xml, 1, $i);
+            $arq['nr_recibo_original'] = $nrRec;
+            $arq['exclusao_arquivo_id'] = isset($exc['arquivo_id']) ? (int) $exc['arquivo_id'] : null;
+            $arquivos[] = $arq;
+        }
+        return $arquivos;
+    }
+
+    private function montarXmlR9000(array $comp, string $tpEvento, string $nrRecEvt): string
     {
         $cnpj = preg_replace('/\D/', '', $comp['cnpj']);
         $id   = $this->gerarId($cnpj);
-        $nrRecibo = $comp['num_recibo'] ?? '';
-        $tpEvt    = $comp['tipo_evento_exclusao'] ?? 'R-2010';
+        $per  = htmlspecialchars((string) $comp['periodo'], ENT_XML1 | ENT_QUOTES, 'UTF-8');
+        $tp   = htmlspecialchars($tpEvento, ENT_XML1 | ENT_QUOTES, 'UTF-8');
+        $rec  = htmlspecialchars($nrRecEvt, ENT_XML1 | ENT_QUOTES, 'UTF-8');
 
-        if (empty($nrRecibo)) throw new \RuntimeException("R-9000 exige número do recibo.");
-
-        $body = "        <ideEvento><tpAmb>{$this->tpAmb}</tpAmb><procEmi>{$this->procEmi}</procEmi><verProc>{$this->verProc}</verProc></ideEvento>\n"
+        $body = "        <ideEvento>\n"
+              . "            <tpAmb>{$this->tpAmb}</tpAmb>\n"
+              . "            <procEmi>{$this->procEmi}</procEmi>\n"
+              . "            <verProc>{$this->verProc}</verProc>\n"
+              . "        </ideEvento>\n"
               . "        {$this->ideContri($cnpj)}\n"
-              . "        <infoExclusao><tpEvento>{$tpEvt}</tpEvento><nrRecEvt>{$nrRecibo}</nrRecEvt><perApur>{$comp['periodo']}</perApur></infoExclusao>";
+              . "        <infoExclusao>"
+              . "<tpEvento>{$tp}</tpEvento>"
+              . "<nrRecEvt>{$rec}</nrRecEvt>"
+              . "<perApur>{$per}</perApur>"
+              . "</infoExclusao>";
 
         return $this->envelope('evtExclusao', 'evtExclusao', $id, $body);
+    }
+
+    /** Converte R2010 / R-2010 → R-2010 (tabela 10). */
+    public function formatarTpEvento(string $evento): string
+    {
+        $evento = strtoupper(trim($evento));
+        if (preg_match('/^R-?(\d{4})$/', $evento, $m)) {
+            return 'R-' . $m[1];
+        }
+        return '';
+    }
+
+    private function gerarR9000(array $comp): string
+    {
+        $nrRecibo = (string) ($comp['num_recibo'] ?? $this->nrRecibo ?? '');
+        $tpEvt    = $this->formatarTpEvento((string) ($comp['tipo_evento_exclusao'] ?? 'R-2010'));
+        if ($nrRecibo === '' || $tpEvt === '') {
+            throw new \RuntimeException('R-9000 exige tipo do evento e número do recibo (use a exclusão na tela de Transmissão).');
+        }
+        return $this->montarXmlR9000($comp, $tpEvt, $nrRecibo);
     }
 }

@@ -36,6 +36,12 @@ class AssinaturaService
                         $certAtivo['senha_encrypted'],
                         CertificadoCrypto::secretFromConfig()
                     );
+                    if ($pfxPass === '') {
+                        throw new \RuntimeException(
+                            'Não foi possível recuperar a senha do certificado. '
+                            . 'O APP_SECRET pode ter mudado — vá em Certificados e envie o PFX de novo com a senha.'
+                        );
+                    }
                 }
             }
         }
@@ -87,6 +93,12 @@ class AssinaturaService
                             $certAtivo['senha_encrypted'],
                             CertificadoCrypto::secretFromConfig()
                         );
+                        if ($pfxPass === '') {
+                            return [
+                                'valido' => false,
+                                'erro'   => 'Senha do certificado inacessível — reenvie o PFX em Certificados',
+                            ];
+                        }
                     }
                 }
             } catch (\Exception $e) {

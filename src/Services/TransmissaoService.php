@@ -272,6 +272,9 @@ class TransmissaoService
                 CertificadoCrypto::secretFromConfig()
             );
         }
+        if ($senha === '') {
+            return null;
+        }
 
         $pfxContent = file_get_contents($certAtivo['caminho']);
         $certs      = [];

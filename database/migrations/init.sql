@@ -300,12 +300,11 @@ CREATE TABLE IF NOT EXISTS arquivos_gerados (
 -- SEEDS
 -- ============================================
 
--- Admin inicial: troque a senha no primeiro login (force_password_change=1).
--- NÃO use esta conta em produção sem alterar a senha.
+-- Admin inicial (senha: admin123). Troque em produção.
 INSERT INTO usuarios (nome, email, senha, perfil, ativo, force_password_change) VALUES
 ('Administrador', 'admin@efdreinf.com.br',
- '$2y$10$i7YbP/ylBPLklB6sh..fqO.kHgA7o8vKHVinZOa9fvbnmAqSzT5Oi',
- 'admin', 1, 1);
+ '$2y$10$/YX/9phBRlfy7NwENyU63uhc9izw/6Mnf9OX51rWq8nm3FTvFNu4i',
+ 'admin', 1, 0);
 
 -- Tabela 01 - Naturezas PF (R-4010)
 INSERT IGNORE INTO naturezas_rendimento (codigo, descricao, aplicavel_pf, aplicavel_pj, grupo, tabela_origem) VALUES

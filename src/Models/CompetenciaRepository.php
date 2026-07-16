@@ -85,4 +85,22 @@ class CompetenciaRepository extends Repository
             'num_recibo' => $protocolo,
         ]);
     }
+
+    /** Reabre competência se não houver mais XMLs com protocolo. */
+    public function reabrirSeSemEnvio(int $id): void
+    {
+        $stmt = $this->db->prepare("
+            SELECT COUNT(*) FROM arquivos_gerados
+            WHERE competencia_id = ?
+              AND protocolo IS NOT NULL AND protocolo <> ''
+        ");
+        $stmt->execute([$id]);
+        if ((int) $stmt->fetchColumn() === 0) {
+            $this->update($id, [
+                'status'     => 'aberto',
+                'data_envio' => null,
+                'num_recibo' => null,
+            ]);
+        }
+    }
 }

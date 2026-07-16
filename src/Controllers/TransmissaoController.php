@@ -6,6 +6,7 @@ use App\Models\CompetenciaRepository;
 use App\Models\ArquivoGeradoRepository;
 use App\Models\TransmissaoLogRepository;
 use App\Models\CertificadoRepository;
+use App\Services\GeracaoXmlService;
 use App\Services\TransmissaoService;
 
 class TransmissaoController extends BaseController
@@ -125,8 +126,9 @@ class TransmissaoController extends BaseController
         }
 
         $msg = ($resultado['sucesso'] ? 'Enviado com sucesso' : 'Falha')
-             . '. Protocolo: ' . ($resultado['protocolo'] ?? '—');
-        $this->redirect($url, $msg, $resultado['sucesso'] ? 'sucesso' : 'erro');
+             . '. ' . ($resultado['desc_retorno'] ?? $resultado['erro'] ?? '')
+             . ' Protocolo: ' . ($resultado['protocolo'] ?? '—');
+        $this->redirect($url, trim($msg), $resultado['sucesso'] ? 'sucesso' : 'erro');
     }
 
     public function consultar(): void
@@ -151,6 +153,7 @@ class TransmissaoController extends BaseController
         $this->logs->registrarConsulta($compId, $uid, $protocolo, $resultado, $this->config['reinf']['tp_amb'] ?? 2);
 
         $qtdRecibos = 0;
+        $extraLimpeza = '';
         if ($resultado['sucesso']) {
             $qtdRecibos = $this->arquivos->aplicarRecibos(
                 $compId,
@@ -158,13 +161,202 @@ class TransmissaoController extends BaseController
                 $resultado['recibos_por_id'] ?? [],
                 $resultado['recibos'] ?? []
             );
+
+            // R-9000 aceito: remove localmente o evento excluído + o próprio R-9000
+            if ($qtdRecibos > 0 || !empty($resultado['recibos']) || !empty($resultado['recibos_por_id'])) {
+                $limpeza = $this->arquivos->limparAposExclusaoR9000($compId, $protocolo, $uid);
+                if ($limpeza['originais'] > 0 || $limpeza['r9000'] > 0) {
+                    $extraLimpeza = " | Exclusão mútua: {$limpeza['originais']} evento(s) e {$limpeza['r9000']} R-9000 removido(s) localmente.";
+                    $this->competencias->reabrirSeSemEnvio($compId);
+                }
+            }
         }
 
         $extra = $qtdRecibos > 0 ? " | {$qtdRecibos} recibo(s) vinculado(s) aos XMLs." : '';
         $this->redirect(
             $url,
-            'Retorno: ' . ($resultado['desc_retorno'] ?? '—') . $extra,
+            'Retorno: ' . ($resultado['desc_retorno'] ?? '—') . $extra . $extraLimpeza,
             $resultado['sucesso'] ? 'sucesso' : 'erro'
+        );
+    }
+
+    /**
+     * Gera, assina e envia R-9000 para excluir na RFB os eventos selecionados (com recibo).
+     * Após consultar o protocolo com sucesso, os XMLs locais são apagados.
+     */
+    public function excluirRfb(): void
+    {
+        $this->requireLogin();
+        $uid        = $this->userId();
+        $compId     = (int) $this->post('competencia_id');
+        $arquivoIds = $this->post('arquivos') ?? [];
+        $url        = "/transmissao?competencia_id={$compId}";
+
+        if (!$compId || empty($arquivoIds)) {
+            $this->redirect($url, 'Selecione ao menos um arquivo com recibo para excluir na RFB.', 'erro');
+        }
+
+        $comp = $this->competencias->findWithContribuinte($compId, $uid);
+        if (!$comp) {
+            $this->redirect('/transmissao', 'Competência não encontrada.', 'erro');
+        }
+
+        $arquivos = $this->arquivos->findByIdsForUser($arquivoIds, $uid);
+        $geracao  = new GeracaoXmlService($this->db);
+        $exclusoes = [];
+
+        foreach ($arquivos as $a) {
+            if (($a['evento'] ?? '') === 'R9000') {
+                continue;
+            }
+            $recibo = trim((string) ($a['nr_recibo_retornado'] ?? ''));
+            $tpEvt  = $geracao->formatarTpEvento((string) ($a['evento'] ?? ''));
+            if ($recibo === '' || $tpEvt === '') {
+                continue;
+            }
+            $exclusoes[] = [
+                'tp_evento'  => $tpEvt,
+                'nr_recibo'  => $recibo,
+                'arquivo_id' => (int) $a['id'],
+            ];
+        }
+
+        if (empty($exclusoes)) {
+            $this->redirect(
+                $url,
+                'Nenhum arquivo selecionado possui recibo RFB. Consulte o protocolo antes de excluir com R-9000.',
+                'erro'
+            );
+        }
+
+        $certAtivo     = $this->certificados->findAtivoByUser($uid);
+        $temCertValido = $certAtivo && strtotime($certAtivo['validade']) > time();
+        $tpAmb         = (int) ($this->config['reinf']['tp_amb'] ?? 2);
+        $allowSim      = !empty($this->config['security']['allow_simulated_transmission']);
+        $isProduction  = ($this->config['app']['env'] ?? '') === 'production' || $tpAmb === 1;
+
+        if (!$temCertValido && ($isProduction || !$allowSim)) {
+            $this->redirect(
+                $url,
+                'Certificado A1 válido obrigatório para enviar R-9000.',
+                'erro'
+            );
+        }
+
+        try {
+            $gerados = $geracao->gerarR9000Exclusoes($comp, $exclusoes);
+        } catch (\Throwable $e) {
+            $this->redirect($url, 'Falha ao gerar R-9000: ' . $e->getMessage(), 'erro');
+        }
+
+        $idsR9000 = [];
+        $xmls     = [];
+        foreach ($gerados as $arq) {
+            $idsR9000[] = $this->arquivos->salvar($compId, $uid, $arq, false, 1, $arq['nr_recibo_original'] ?? null);
+            $xmls[]     = $arq['xml'];
+        }
+
+        $service   = new TransmissaoService($this->db, $uid);
+        $resultado = $temCertValido
+            ? $service->enviarLote($comp['cnpj'], $xmls, assinar: true)
+            : $service->enviarSimulado($comp['cnpj'], $xmls);
+
+        $this->logs->registrarEnvio($compId, $uid, 'R9000', $resultado);
+
+        if (!$resultado['sucesso']) {
+            $this->redirect(
+                $url,
+                'Falha no envio do R-9000: ' . ($resultado['desc_retorno'] ?? $resultado['erro'] ?? '—'),
+                'erro'
+            );
+        }
+
+        $protocolo = (string) ($resultado['protocolo'] ?? '');
+        if ($protocolo !== '') {
+            $this->arquivos->marcarProtocolo($idsR9000, $protocolo);
+        }
+
+        if (!empty($resultado['simulado'])) {
+            // Simulação: limpa localmente (RFB não recebeu nada oficial)
+            $limpeza = $this->arquivos->limparAposExclusaoR9000($compId, $protocolo, $uid);
+            $this->competencias->reabrirSeSemEnvio($compId);
+            $this->redirect(
+                $url,
+                "Simulação R-9000 ok. Removidos localmente: {$limpeza['originais']} evento(s) + {$limpeza['r9000']} R-9000. "
+                . 'Com certificado, a exclusão oficial exige consultar o protocolo após o envio.',
+                'sucesso'
+            );
+        }
+
+        $this->redirect(
+            $url,
+            'R-9000 enviado. Protocolo: ' . ($protocolo ?: '—')
+            . '. Consulte o protocolo abaixo — ao aceitar, o sistema apaga o evento local e o R-9000.',
+            'sucesso'
+        );
+    }
+
+    /**
+     * Apaga XMLs gerados localmente (não exclui na RFB).
+     */
+    public function excluirArquivos(): void
+    {
+        $this->requireLogin();
+        $uid        = $this->userId();
+        $compId     = (int) $this->post('competencia_id');
+        $arquivoIds = $this->post('arquivos') ?? [];
+        $voltar     = trim((string) $this->post('voltar', ''));
+        if ($voltar === 'gerar' && $compId) {
+            $url = "/gerar?competencia_id={$compId}";
+        } else {
+            $url = $compId ? "/transmissao?competencia_id={$compId}" : '/transmissao';
+        }
+
+        if (empty($arquivoIds)) {
+            $this->redirect($url, 'Selecione ao menos um arquivo para apagar.', 'erro');
+        }
+
+        if ($compId) {
+            $comp = $this->competencias->findWithContribuinte($compId, $uid);
+            if (!$comp) {
+                $this->redirect('/transmissao', 'Competência não encontrada.', 'erro');
+            }
+        }
+
+        $result = $this->arquivos->excluirForUser($arquivoIds, $uid);
+        foreach ($result['competencia_ids'] as $cid) {
+            $this->competencias->reabrirSeSemEnvio((int) $cid);
+        }
+
+        if ($result['excluidos'] === 0) {
+            $this->redirect($url, 'Nenhum arquivo encontrado para apagar.', 'erro');
+        }
+
+        $msg = "{$result['excluidos']} arquivo(s) apagado(s) localmente.";
+        if ($result['com_recibo'] > 0) {
+            $msg .= " Atenção: {$result['com_recibo']} tinha recibo na RFB — a exclusão oficial exige R-9000.";
+        }
+        $this->redirect($url, $msg, 'sucesso');
+    }
+
+    /** Apaga linhas do histórico de transmissão (local). */
+    public function excluirHistorico(): void
+    {
+        $this->requireLogin();
+        $uid  = $this->userId();
+        $ids  = $this->post('historico') ?? [];
+        $compId = (int) $this->post('competencia_id', 0);
+        $url  = $compId ? "/transmissao?competencia_id={$compId}" : '/transmissao';
+
+        if (empty($ids)) {
+            $this->redirect($url, 'Selecione ao menos um registro do histórico.', 'erro');
+        }
+
+        $qtd = $this->logs->excluirForUser($ids, $uid);
+        $this->redirect(
+            $url,
+            $qtd > 0 ? "{$qtd} registro(s) do histórico apagado(s)." : 'Nenhum registro apagado.',
+            $qtd > 0 ? 'sucesso' : 'erro'
         );
     }
 }

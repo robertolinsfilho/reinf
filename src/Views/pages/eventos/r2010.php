@@ -107,11 +107,12 @@
                             <th class="text-end">Bruto</th>
                             <th class="text-end">Base</th>
                             <th class="text-end">Retenção</th>
+                            <th></th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php if (empty($registros)): ?>
-                        <tr><td colspan="7" class="text-center text-muted py-4">Nenhum registro. Adicione manualmente ou <a href="/importar">importe pelo Excel</a>.</td></tr>
+                        <tr><td colspan="8" class="text-center text-muted py-4">Nenhum registro. Adicione manualmente ou <a href="/importar">importe pelo Excel</a>.</td></tr>
                         <?php else: foreach ($registros as $r): ?>
                         <tr>
                             <td class="font-monospace small"><?= $r['cnpj_prestador'] ?></td>
@@ -121,6 +122,14 @@
                             <td class="text-end small">R$ <?= number_format((float) $r['valor_bruto'], 2, ',', '.') ?></td>
                             <td class="text-end small">R$ <?= number_format((float) (($r['valor_base_retencao'] ?? 0) ?: $r['valor_bruto']), 2, ',', '.') ?></td>
                             <td class="text-end small text-danger">R$ <?= number_format((float) $r['valor_retencao'], 2, ',', '.') ?></td>
+                            <td>
+                                <form action="/eventos/r2010/excluir" method="POST" onsubmit="return confirm('Apagar este registro localmente?')">
+                                    <?= $csrfField ?>
+                                    <input type="hidden" name="id" value="<?= (int) $r['id'] ?>">
+                                    <input type="hidden" name="competencia_id" value="<?= (int) $competencia['id'] ?>">
+                                    <button class="btn btn-outline-danger btn-sm py-0 px-1" title="Apagar local"><i class="bi bi-trash3"></i></button>
+                                </form>
+                            </td>
                         </tr>
                         <?php endforeach; endif; ?>
                     </tbody>
@@ -131,6 +140,7 @@
                             <td class="text-end small">R$ <?= number_format(array_sum(array_column($registros,'valor_bruto')), 2, ',', '.') ?></td>
                             <td class="text-end small">R$ <?= number_format(array_sum(array_map(fn($r) => (float) (($r['valor_base_retencao'] ?? 0) ?: $r['valor_bruto']), $registros)), 2, ',', '.') ?></td>
                             <td class="text-end small text-danger">R$ <?= number_format(array_sum(array_column($registros,'valor_retencao')), 2, ',', '.') ?></td>
+                            <td></td>
                         </tr>
                     </tfoot>
                     <?php endif; ?>
