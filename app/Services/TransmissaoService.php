@@ -167,8 +167,14 @@ class TransmissaoService
 
     private function montarLote(string $nrInsc, array $eventosXml): string
     {
-        $nrInsc = preg_replace('/\D/', '', $nrInsc) ?? '';
-        $tpInsc = strlen($nrInsc) <= 11 ? '2' : '1';
+        // Mesma regra do ideContri: CNPJ = raiz 8 dígitos; CPF = 11
+        $nr = preg_replace('/\D/', '', $nrInsc) ?? '';
+        $tpInsc = strlen($nr) <= 11 ? '2' : '1';
+        if ($tpInsc === '1') {
+            $nr = substr(str_pad($nr, 8, '0', STR_PAD_LEFT), 0, 8);
+        } else {
+            $nr = substr(str_pad($nr, 11, '0', STR_PAD_LEFT), 0, 11);
+        }
 
         $eventosStr = '';
         foreach ($eventosXml as $i => $xml) {
@@ -182,7 +188,7 @@ class TransmissaoService
              . "  <envioLoteEventos>\n"
              . "    <ideContribuinte>\n"
              . "      <tpInsc>{$tpInsc}</tpInsc>\n"
-             . "      <nrInsc>{$nrInsc}</nrInsc>\n"
+             . "      <nrInsc>{$nr}</nrInsc>\n"
              . "    </ideContribuinte>\n"
              . "    <eventos>\n"
              . $eventosStr

@@ -64,11 +64,17 @@ class GeracaoXmlService
                 }
                 continue;
             }
+            if ($evento === 'R2020') {
+                $xmls = $this->gerarR2020PorTomador($competencia);
+                foreach ($xmls as $i => $xml) {
+                    $arquivos[] = $this->salvarXml($evento, $competencia, $xml, $indRetif, $i);
+                }
+                continue;
+            }
 
             $xml = match ($evento) {
                 'R1000' => $this->gerarR1000($competencia),
                 'R1070' => $this->gerarR1070($competencia),
-                'R2020' => $this->gerarR2020($competencia),
                 'R2060' => $this->gerarR2060($competencia),
                 'R2099' => $this->gerarR2099($competencia),
                 'R4010' => $this->gerarR4010($competencia),
@@ -103,12 +109,35 @@ class GeracaoXmlService
 
     private function gerarId(string $cnpj): string
     {
-        // ID = 'ID' + [1-2] + 14 dígitos CNPJ + timestamp YYYYMMDDhhmmss + sequencial 5 dígitos
-        // Total: 2 + 1 + 14 + 14 + 5 = 36 chars (padrão XSD)
+        // Manual RFB: ID + tpInsc(1) + nrInsc(14) + AAAAMMDDHHMMSS + seq(5) = 36 chars
+        // CNPJ: raiz 8 + zeros à direita até 14 (deve coincidir com ideContri — MS1010)
+        [$tp, $nrInsc] = $this->tpENrInscContribuinte($cnpj);
+        $nrId = $tp === '1'
+            ? str_pad($nrInsc, 14, '0', STR_PAD_RIGHT)
+            : str_pad($nrInsc, 14, '0', STR_PAD_LEFT);
+
         $this->idSeq = ($this->idSeq + 1) % 100000;
-        return 'ID1' . str_pad($cnpj, 14, '0', STR_PAD_LEFT) . date('YmdHis') . str_pad((string) $this->idSeq, 5, '0', STR_PAD_LEFT);
+        return 'ID' . $tp . $nrId . date('YmdHis') . str_pad((string) $this->idSeq, 5, '0', STR_PAD_LEFT);
     }
-    
+
+    /**
+     * nrInsc do contribuinte no evento/lote (Manual do Desenvolvedor):
+     * CNPJ = raiz/base 8 dígitos (exceto Adm. Pública Direta Federal — não tratado aqui).
+     * CPF = 11 dígitos.
+     *
+     * @return array{0: string, 1: string} [tpInsc, nrInsc]
+     */
+    private function tpENrInscContribuinte(string $inscricao, ?string $tpInsc = null): array
+    {
+        $nr = preg_replace('/\D/', '', $inscricao) ?? '';
+        $tp = $tpInsc ?? (strlen($nr) <= 11 ? '2' : '1');
+        if ($tp === '1') {
+            $nr = substr(str_pad($nr, 8, '0', STR_PAD_LEFT), 0, 8);
+        } else {
+            $nr = substr(str_pad($nr, 11, '0', STR_PAD_LEFT), 0, 11);
+        }
+        return [$tp, $nr];
+    }
 
     private function ideEvento(string $perApur, int $indRetif = 1, ?string $nrRecibo = null): string
     {
@@ -141,12 +170,7 @@ class GeracaoXmlService
 
     private function ideContri(string $cnpj, ?string $tpInsc = null): string
     {
-        $nr = preg_replace('/\D/', '', $cnpj) ?? '';
-        $tp = $tpInsc ?? (strlen($nr) <= 11 ? '2' : '1');
-        // MS1007 / layout: for tpInsc=1 (CNPJ), nrInsc is the 8-digit root
-        if ($tp === '1' && strlen($nr) >= 8) {
-            $nr = substr($nr, 0, 8);
-        }
+        [$tp, $nr] = $this->tpENrInscContribuinte($cnpj, $tpInsc);
         return "<ideContri>\n            <tpInsc>{$tp}</tpInsc>\n            <nrInsc>{$nr}</nrInsc>\n        </ideContri>";
     }
 
@@ -195,7 +219,7 @@ class GeracaoXmlService
 
         $email    = trim((string) ($comp['email'] ?? ''));
         $telefone = preg_replace('/\D/', '', (string) ($comp['telefone'] ?? '')) ?? '';
-        if (strlen($telefone) < 10) {
+        if (strlen($telefone) < 10 || strlen($telefone) > 13) {
             throw new \RuntimeException('Cadastre telefone com DDD (mín. 10 dígitos) no contribuinte.');
         }
 
@@ -211,10 +235,15 @@ class GeracaoXmlService
             throw new \RuntimeException('Acordo de isenção de multa só é permitido com classTrib 60.');
         }
 
+        // Contato: foneCel (11 dígitos) ou foneFixo (10); e-mail opcional
         $contatoXml = "                    <contato>\n"
                     . "                        <nmCtt>" . htmlspecialchars($nomeContato, ENT_XML1 | ENT_QUOTES, 'UTF-8') . "</nmCtt>\n"
-                    . "                        <cpfCtt>{$cpfContato}</cpfCtt>\n"
-                    . "                        <foneFixo>{$telefone}</foneFixo>\n";
+                    . "                        <cpfCtt>{$cpfContato}</cpfCtt>\n";
+        if (strlen($telefone) >= 11) {
+            $contatoXml .= "                        <foneCel>{$telefone}</foneCel>\n";
+        } else {
+            $contatoXml .= "                        <foneFixo>{$telefone}</foneFixo>\n";
+        }
         if ($email !== '') {
             $contatoXml .= "                        <email>" . htmlspecialchars($email, ENT_XML1 | ENT_QUOTES, 'UTF-8') . "</email>\n";
         }
@@ -350,13 +379,20 @@ class GeracaoXmlService
 
             $nfsXml = '';
             foreach ($nfs as $n) {
+                // Leiaute: vlrBruto deve ser > 0 (MS0030 em valores negativos)
                 $vBruto = (float) ($n['valor_bruto'] ?? 0);
+                if ($vBruto <= 0) {
+                    continue;
+                }
                 $vBase  = (float) ($n['valor_base_retencao'] ?? 0);
                 if ($vBase <= 0) {
                     $vBase = $vBruto;
                 }
                 $vRet = (float) ($n['valor_retencao'] ?? 0);
-                if ($vRet <= 0 && $vBase > 0) {
+                if ($vRet < 0) {
+                    continue;
+                }
+                if ($vRet == 0.0 && $vBase > 0) {
                     $aliq = $indCprb === '1' ? 0.035 : 0.11;
                     $vRet = round($vBase * $aliq, 2);
                 }
@@ -390,6 +426,10 @@ class GeracaoXmlService
                          . "                    </nfs>\n";
             }
 
+            if ($nfsXml === '') {
+                continue;
+            }
+
             $reciboEvt = $reciboPadrao;
             if ($this->indRetif === 2 && count($porPrest) === 1 && $reciboPadrao) {
                 $reciboEvt = $reciboPadrao;
@@ -414,6 +454,10 @@ class GeracaoXmlService
                   . "        </infoServTom>";
 
             $xmls[] = $this->envelope('evtServTom', 'evtTomadorServicos', $id, $body);
+        }
+
+        if (empty($xmls)) {
+            throw new \RuntimeException('Nenhuma NF válida no R-2010 (vlrBruto deve ser > 0).');
         }
 
         return $xmls;
@@ -536,38 +580,118 @@ class GeracaoXmlService
 
     // ═══ R-2020 ═══════════════════════════════════════
 
-    private function gerarR2020(array $comp): string
+    /**
+     * R-2020: um XML por tomador (XSD: ideTomador ocorre 1-1 em ideEstabPrest).
+     *
+     * @return list<string>
+     */
+    private function gerarR2020PorTomador(array $comp): array
     {
-        $cnpj = preg_replace('/\D/', '', $comp['cnpj']);
-        $id   = $this->gerarId($cnpj);
+        $cnpj = preg_replace('/\D/', '', (string) $comp['cnpj']) ?? '';
 
-        $registros = $this->eventos->listarParaGeracao('r2020', (int) $comp['id'], 'id ASC');
-        if (empty($registros)) throw new \RuntimeException("Nenhum registro R-2020.");
+        $registros = $this->eventos->listarParaGeracao('r2020', (int) $comp['id'], 'cnpj_tomador, data_emissao, id');
+        if (empty($registros)) {
+            throw new \RuntimeException('Nenhum registro R-2020.');
+        }
+
+        $reciboPadrao = $this->nrRecibo;
+        if ($this->indRetif === 2 && !$reciboPadrao) {
+            $reciboPadrao = $this->ultimoReciboEvento((int) $comp['id'], 'R2020');
+        }
 
         $porTom = [];
-        foreach ($registros as $r) $porTom[preg_replace('/\D/', '', $r['cnpj_tomador'])][] = $r;
-
-        $reciboEvt = $this->nrRecibo;
-        if ($this->indRetif === 2 && !$reciboEvt) {
-            $reciboEvt = $this->ultimoReciboEvento((int) $comp['id'], 'R2020');
-        }
-
-        $xml = '';
-        foreach ($porTom as $cnpjT => $nfs) {
-            $totBruto = array_sum(array_column($nfs, 'valor_bruto'));
-            $totRet   = array_sum(array_column($nfs, 'valor_retencao'));
-            $nfsXml = '';
-            foreach ($nfs as $n) {
-                $nfsXml .= "                    <nfs><serie>" . ($n['serie'] ?? '1') . "</serie><numDocto>" . ($n['num_documento'] ?: '1') . "</numDocto><dtEmissaoNF>" . ($n['data_emissao'] ?: date('Y-m-d')) . "</dtEmissaoNF><vlrBruto>" . $this->fmtVal($n['valor_bruto']) . "</vlrBruto><vlrBaseRet>" . $this->fmtVal($n['valor_bruto']) . "</vlrBaseRet><vlrRetencao>" . $this->fmtVal($n['valor_retencao']) . "</vlrRetencao><vlrRetSub>" . $this->fmtVal(0) . "</vlrRetSub><vlrNRetPrinc>" . $this->fmtVal(0) . "</vlrNRetPrinc><vlrServicos15>" . $this->fmtVal($n['valor_bruto']) . "</vlrServicos15><vlrServicos20>" . $this->fmtVal(0) . "</vlrServicos20><vlrServicos25>" . $this->fmtVal(0) . "</vlrServicos25><vlrAdicional>" . $this->fmtVal(0) . "</vlrAdicional><vlrNRetAdwordc>" . $this->fmtVal(0) . "</vlrNRetAdwordc></nfs>\n";
+        foreach ($registros as $r) {
+            $cnpjT = preg_replace('/\D/', '', (string) ($r['cnpj_tomador'] ?? '')) ?? '';
+            if ($cnpjT === '') {
+                continue;
             }
-            $xml .= "                <ideTomador><tpInscTomador>1</tpInscTomador><nrInscTomador>{$cnpjT}</nrInscTomador><vlrTotalBruto>" . $this->fmtVal($totBruto) . "</vlrTotalBruto><vlrTotalBaseRet>" . $this->fmtVal($totBruto) . "</vlrTotalBaseRet><vlrTotalRetPrinc>" . $this->fmtVal($totRet) . "</vlrTotalRetPrinc><vlrTotalRetAdic>" . $this->fmtVal(0) . "</vlrTotalRetAdic><vlrTotalNRetPrinc>" . $this->fmtVal(0) . "</vlrTotalNRetPrinc><vlrTotalNRetAdic>" . $this->fmtVal(0) . "</vlrTotalNRetAdic>\n{$nfsXml}                </ideTomador>\n";
+            $porTom[$cnpjT][] = $r;
+        }
+        if (empty($porTom)) {
+            throw new \RuntimeException('Nenhum tomador válido no R-2020.');
         }
 
-        $body = "        {$this->ideEvento($comp['periodo'], $this->indRetif, $reciboEvt)}\n"
-              . "        {$this->ideContri($cnpj)}\n"
-              . "        <ideEstabPrest><tpInscEstabPrest>1</tpInscEstabPrest><nrInscEstabPrest>{$cnpj}</nrInscEstabPrest>\n{$xml}        </ideEstabPrest>";
+        $xmls = [];
+        foreach ($porTom as $cnpjT => $nfs) {
+            $tpTom = (string) ($nfs[0]['tipo_insc_tomador'] ?? '1');
+            if (!in_array($tpTom, ['1', '4'], true)) {
+                $tpTom = '1';
+            }
 
-        return $this->envelope('evtServPrest', 'evtServicosPrestados', $id, $body);
+            $totBruto = 0.0;
+            $totBase  = 0.0;
+            $totRet   = 0.0;
+            $nfsXml   = '';
+
+            foreach ($nfs as $n) {
+                $vBruto = (float) ($n['valor_bruto'] ?? 0);
+                if ($vBruto <= 0) {
+                    continue;
+                }
+                $vBase = (float) ($n['valor_base_retencao'] ?? 0);
+                if ($vBase <= 0) {
+                    $vBase = $vBruto;
+                }
+                $vRet = (float) ($n['valor_retencao'] ?? 0);
+                if ($vRet < 0) {
+                    continue;
+                }
+
+                $serie    = trim((string) ($n['serie'] ?? ''));
+                $serie    = $serie !== '' ? $serie : '0';
+                $numDocto = trim((string) ($n['num_documento'] ?? ''));
+                $numDocto = $numDocto !== '' ? $numDocto : '1';
+                $dtEm     = $n['data_emissao'] ?: ($comp['periodo'] . '-01');
+
+                $totBruto += $vBruto;
+                $totBase  += $vBase;
+                $totRet   += $vRet;
+
+                // Campos de retenção ficam em infoTpServ (não direto em nfs)
+                $nfsXml .= "                    <nfs>\n"
+                         . '                        <serie>' . htmlspecialchars($serie, ENT_XML1 | ENT_QUOTES, 'UTF-8') . "</serie>\n"
+                         . '                        <numDocto>' . htmlspecialchars($numDocto, ENT_XML1 | ENT_QUOTES, 'UTF-8') . "</numDocto>\n"
+                         . "                        <dtEmissaoNF>{$dtEm}</dtEmissaoNF>\n"
+                         . '                        <vlrBruto>' . $this->fmtVal($vBruto) . "</vlrBruto>\n"
+                         . "                        <infoTpServ>\n"
+                         . "                            <tpServico>100000001</tpServico>\n"
+                         . '                            <vlrBaseRet>' . $this->fmtVal($vBase) . "</vlrBaseRet>\n"
+                         . '                            <vlrRetencao>' . $this->fmtVal($vRet) . "</vlrRetencao>\n"
+                         . "                        </infoTpServ>\n"
+                         . "                    </nfs>\n";
+            }
+
+            if ($nfsXml === '') {
+                continue;
+            }
+
+            $id = $this->gerarId($cnpj);
+            $body = "        {$this->ideEvento($comp['periodo'], $this->indRetif, $reciboPadrao)}\n"
+                  . "        {$this->ideContri($cnpj)}\n"
+                  . "        <infoServPrest>\n"
+                  . "            <ideEstabPrest>\n"
+                  . "                <tpInscEstabPrest>1</tpInscEstabPrest>\n"
+                  . "                <nrInscEstabPrest>{$cnpj}</nrInscEstabPrest>\n"
+                  . "                <ideTomador>\n"
+                  . "                    <tpInscTomador>{$tpTom}</tpInscTomador>\n"
+                  . "                    <nrInscTomador>{$cnpjT}</nrInscTomador>\n"
+                  . "                    <indObra>0</indObra>\n"
+                  . '                    <vlrTotalBruto>' . $this->fmtVal($totBruto) . "</vlrTotalBruto>\n"
+                  . '                    <vlrTotalBaseRet>' . $this->fmtVal($totBase) . "</vlrTotalBaseRet>\n"
+                  . '                    <vlrTotalRetPrinc>' . $this->fmtVal($totRet) . "</vlrTotalRetPrinc>\n"
+                  . $nfsXml
+                  . "                </ideTomador>\n"
+                  . "            </ideEstabPrest>\n"
+                  . "        </infoServPrest>";
+
+            $xmls[] = $this->envelope('evtServPrest', 'evtServicosPrestados', $id, $body);
+        }
+
+        if (empty($xmls)) {
+            throw new \RuntimeException('Nenhuma NF válida no R-2020 (vlrBruto deve ser > 0).');
+        }
+
+        return $xmls;
     }
 
     // ═══ R-2060 ═══════════════════════════════════════
