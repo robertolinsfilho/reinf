@@ -143,6 +143,10 @@ class GeracaoXmlService
     {
         $nr = preg_replace('/\D/', '', $cnpj) ?? '';
         $tp = $tpInsc ?? (strlen($nr) <= 11 ? '2' : '1');
+        // MS1007 / layout: for tpInsc=1 (CNPJ), nrInsc is the 8-digit root
+        if ($tp === '1' && strlen($nr) >= 8) {
+            $nr = substr($nr, 0, 8);
+        }
         return "<ideContri>\n            <tpInsc>{$tp}</tpInsc>\n            <nrInsc>{$nr}</nrInsc>\n        </ideContri>";
     }
 
