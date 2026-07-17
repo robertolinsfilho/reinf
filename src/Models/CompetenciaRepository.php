@@ -67,6 +67,55 @@ class CompetenciaRepository extends Repository
         return array_values($groups);
     }
 
+    public function countByUser(int $userId): int
+    {
+        return (int) $this->scalar(
+            "SELECT COUNT(*) FROM competencias c
+             JOIN contribuintes co ON co.id = c.contribuinte_id
+             WHERE co.usuario_id = ?",
+            [$userId]
+        );
+    }
+
+    public function countTransmitidosByUser(int $userId): int
+    {
+        return (int) $this->scalar(
+            "SELECT COUNT(*) FROM competencias c
+             JOIN contribuintes co ON co.id = c.contribuinte_id
+             WHERE co.usuario_id = ? AND c.status = 'transmitido'",
+            [$userId]
+        );
+    }
+
+    public function listRecentByUser(int $userId, int $limit = 5): array
+    {
+        $limit = max(1, min(50, $limit));
+        return $this->query(
+            "SELECT c.*, co.razao_social, co.cnpj
+             FROM competencias c
+             JOIN contribuintes co ON co.id = c.contribuinte_id
+             WHERE co.usuario_id = ?
+             ORDER BY c.periodo DESC
+             LIMIT {$limit}",
+            [$userId]
+        );
+    }
+
+    /** IDs de competências abertas/fechadas do usuário (mais recentes primeiro). */
+    public function listIdsAbertasOuFechadas(int $userId, int $limit = 2): array
+    {
+        $limit = max(1, min(20, $limit));
+        $rows = $this->query(
+            "SELECT c.id FROM competencias c
+             JOIN contribuintes co ON co.id = c.contribuinte_id
+             WHERE co.usuario_id = ? AND c.status IN ('aberto', 'fechado')
+             ORDER BY c.periodo DESC
+             LIMIT {$limit}",
+            [$userId]
+        );
+        return array_map(static fn(array $r): int => (int) $r['id'], $rows);
+    }
+
     public function exists(int $contribuinteId, string $periodo): bool
     {
         return (bool) $this->queryOne(

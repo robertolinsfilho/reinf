@@ -172,6 +172,42 @@ class ArquivoGeradoRepository extends Repository
         return $this->query($sql, $params);
     }
 
+    /** Último recibo retornado de um evento na competência. */
+    public function ultimoReciboEvento(int $competenciaId, string $evento): ?string
+    {
+        $row = $this->queryOne(
+            "SELECT nr_recibo_retornado
+             FROM arquivos_gerados
+             WHERE competencia_id = ?
+               AND evento = ?
+               AND nr_recibo_retornado IS NOT NULL
+               AND nr_recibo_retornado <> ''
+             ORDER BY id DESC
+             LIMIT 1",
+            [$competenciaId, $evento]
+        );
+        return $row ? (string) $row['nr_recibo_retornado'] : null;
+    }
+
+    /**
+     * XMLs com recibo (para montar mapa de retificação no serviço de geração).
+     *
+     * @return list<array{nr_recibo_retornado: string, xml_conteudo: ?string}>
+     */
+    public function listXmlsComRecibo(int $competenciaId, string $evento): array
+    {
+        return $this->query(
+            "SELECT nr_recibo_retornado, xml_conteudo
+             FROM arquivos_gerados
+             WHERE competencia_id = ?
+               AND evento = ?
+               AND nr_recibo_retornado IS NOT NULL
+               AND nr_recibo_retornado <> ''
+             ORDER BY id DESC",
+            [$competenciaId, $evento]
+        );
+    }
+
     /**
      * Exclui XMLs gerados do usuário (banco + arquivo em disco).
      * Não remove nada na RFB — para isso use R-9000.

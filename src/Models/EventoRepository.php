@@ -13,8 +13,13 @@ class EventoRepository
         'created_at DESC',
         'data_pagamento ASC',
         'data_pagamento DESC',
+        'data_emissao ASC',
+        'data_emissao DESC',
         'id ASC',
         'id DESC',
+        'cnpj_prestador, data_emissao, id',
+        'cnpj_beneficiario, natureza_rendimento, data_pagamento',
+        'nr_insc_adquirente, nr_insc_produtor, ind_aquis, id',
     ];
 
     private \PDO $db;
@@ -22,6 +27,16 @@ class EventoRepository
     public function __construct(\PDO $db)
     {
         $this->db = $db;
+    }
+
+    /** Todos os registros da competência (geração XML), sem limite artificial. */
+    public function listarParaGeracao(string $evento, int $competenciaId, string $orderBy = 'id ASC'): array
+    {
+        $tabela  = $this->validarTabela($evento);
+        $orderBy = $this->validarOrderBy($orderBy);
+        $stmt    = $this->db->prepare("SELECT * FROM {$tabela} WHERE competencia_id = ? ORDER BY {$orderBy}");
+        $stmt->execute([$competenciaId]);
+        return $stmt->fetchAll();
     }
 
     public function listar(string $evento, int $competenciaId, string $orderBy = 'created_at DESC', int $limit = 100, int $offset = 0): array

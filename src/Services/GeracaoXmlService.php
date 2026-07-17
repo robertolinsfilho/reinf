@@ -2,6 +2,10 @@
 
 namespace App\Services;
 
+use App\Models\ArquivoGeradoRepository;
+use App\Models\EventoRepository;
+use App\Models\ProcessoRepository;
+
 class GeracaoXmlService
 {
     private string $outputDir;
@@ -11,6 +15,9 @@ class GeracaoXmlService
     private string $verProc;
     private int $procEmi;
     private int $idSeq = 0;
+    private EventoRepository $eventos;
+    private ArquivoGeradoRepository $arquivos;
+    private ProcessoRepository $processos;
 
     public function __construct(private \PDO $db)
     {
@@ -23,6 +30,9 @@ class GeracaoXmlService
         $this->tpAmb   = $config['reinf']['tp_amb'] ?? 2;
         $this->verProc = $config['reinf']['ver_proc'] ?? 'EFD-REINF-WEB-1.0';
         $this->procEmi = $config['reinf']['proc_emi'] ?? 1;
+        $this->eventos   = new EventoRepository($db);
+        $this->arquivos  = new ArquivoGeradoRepository($db);
+        $this->processos = new ProcessoRepository($db);
     }
 
     public function gerar(array $competencia, array $eventos, int $indRetif = 1, ?string $nrRecibo = null): array
@@ -172,9 +182,7 @@ class GeracaoXmlService
         $cnpj = preg_replace('/\D/', '', $comp['cnpj']);
         $id   = $this->gerarId($cnpj);
 
-        $stmt = $this->db->prepare("SELECT * FROM r1070_processos WHERE contribuinte_id = ? AND status = 'ativo'");
-        $stmt->execute([$comp['contribuinte_id']]);
-        $processos = $stmt->fetchAll();
+        $processos = $this->processos->listAtivosByContribuinte((int) $comp['contribuinte_id']);
 
         if (empty($processos)) {
             throw new \RuntimeException("Nenhum processo cadastrado.");
@@ -206,9 +214,7 @@ class GeracaoXmlService
         $cnpj = preg_replace('/\D/', '', $comp['cnpj']);
         $id   = $this->gerarId($cnpj);
 
-        $stmt = $this->db->prepare("SELECT * FROM r2010 WHERE competencia_id = ? ORDER BY cnpj_prestador, data_emissao, id");
-        $stmt->execute([$comp['id']]);
-        $registros = $stmt->fetchAll();
+        $registros = $this->eventos->listarParaGeracao('r2010', (int) $comp['id'], 'cnpj_prestador, data_emissao, id');
 
         if (empty($registros)) {
             throw new \RuntimeException("Nenhum registro R-2010.");
@@ -310,13 +316,11 @@ class GeracaoXmlService
     {
         $cnpj = preg_replace('/\D/', '', $comp['cnpj']);
 
-        $stmt = $this->db->prepare("
-            SELECT * FROM r2055
-            WHERE competencia_id = ?
-            ORDER BY nr_insc_adquirente, nr_insc_produtor, ind_aquis, id
-        ");
-        $stmt->execute([$comp['id']]);
-        $registros = $stmt->fetchAll();
+        $registros = $this->eventos->listarParaGeracao(
+            'r2055',
+            (int) $comp['id'],
+            'nr_insc_adquirente, nr_insc_produtor, ind_aquis, id'
+        );
         if (empty($registros)) {
             return [];
         }
@@ -400,18 +404,8 @@ class GeracaoXmlService
     /** Mapa adquirente|produtor => recibo R-2055 consultado. */
     private function mapRecibosR2055(int $competenciaId): array
     {
-        $stmt = $this->db->prepare("
-            SELECT nr_recibo_retornado, xml_conteudo
-            FROM arquivos_gerados
-            WHERE competencia_id = ?
-              AND evento = 'R2055'
-              AND nr_recibo_retornado IS NOT NULL
-              AND nr_recibo_retornado <> ''
-            ORDER BY id DESC
-        ");
-        $stmt->execute([$competenciaId]);
         $map = [];
-        foreach ($stmt->fetchAll() as $row) {
+        foreach ($this->arquivos->listXmlsComRecibo($competenciaId, 'R2055') as $row) {
             $xml = (string) ($row['xml_conteudo'] ?? '');
             if (
                 $xml === ''
@@ -435,9 +429,7 @@ class GeracaoXmlService
         $cnpj = preg_replace('/\D/', '', $comp['cnpj']);
         $id   = $this->gerarId($cnpj);
 
-        $stmt = $this->db->prepare("SELECT * FROM r2020 WHERE competencia_id = ?");
-        $stmt->execute([$comp['id']]);
-        $registros = $stmt->fetchAll();
+        $registros = $this->eventos->listarParaGeracao('r2020', (int) $comp['id'], 'id ASC');
         if (empty($registros)) throw new \RuntimeException("Nenhum registro R-2020.");
 
         $porTom = [];
@@ -473,9 +465,7 @@ class GeracaoXmlService
         $cnpj = preg_replace('/\D/', '', $comp['cnpj']);
         $id   = $this->gerarId($cnpj);
 
-        $stmt = $this->db->prepare("SELECT * FROM r2060 WHERE competencia_id = ?");
-        $stmt->execute([$comp['id']]);
-        $registros = $stmt->fetchAll();
+        $registros = $this->eventos->listarParaGeracao('r2060', (int) $comp['id'], 'id ASC');
         if (empty($registros)) throw new \RuntimeException("Nenhum registro R-2060.");
 
         $reciboEvt = $this->nrRecibo;
@@ -519,9 +509,7 @@ class GeracaoXmlService
         $cnpj = preg_replace('/\D/', '', $comp['cnpj']);
         $id   = $this->gerarId($cnpj);
 
-        $stmt = $this->db->prepare("SELECT * FROM r4010 WHERE competencia_id = ?");
-        $stmt->execute([$comp['id']]);
-        $registros = $stmt->fetchAll();
+        $registros = $this->eventos->listarParaGeracao('r4010', (int) $comp['id'], 'id ASC');
         if (empty($registros)) throw new \RuntimeException("Nenhum registro R-4010.");
 
         $porB = [];
@@ -564,9 +552,11 @@ class GeracaoXmlService
     {
         $cnpj = preg_replace('/\D/', '', $comp['cnpj']);
 
-        $stmt = $this->db->prepare("SELECT * FROM r4020 WHERE competencia_id = ? ORDER BY cnpj_beneficiario, natureza_rendimento, data_pagamento");
-        $stmt->execute([$comp['id']]);
-        $registros = $stmt->fetchAll();
+        $registros = $this->eventos->listarParaGeracao(
+            'r4020',
+            (int) $comp['id'],
+            'cnpj_beneficiario, natureza_rendimento, data_pagamento'
+        );
         if (empty($registros)) return [];
 
         // Recibos anteriores por beneficiário (retificação)
@@ -719,36 +709,14 @@ class GeracaoXmlService
     /** Último recibo consultado de um evento na competência (retificação). */
     private function ultimoReciboEvento(int $competenciaId, string $evento): ?string
     {
-        $stmt = $this->db->prepare("
-            SELECT nr_recibo_retornado
-            FROM arquivos_gerados
-            WHERE competencia_id = ?
-              AND evento = ?
-              AND nr_recibo_retornado IS NOT NULL
-              AND nr_recibo_retornado <> ''
-            ORDER BY id DESC
-            LIMIT 1
-        ");
-        $stmt->execute([$competenciaId, $evento]);
-        $row = $stmt->fetch();
-        return $row ? (string) $row['nr_recibo_retornado'] : null;
+        return $this->arquivos->ultimoReciboEvento($competenciaId, $evento);
     }
 
     /** Mapa cpfBenef => recibo dos XMLs R-4010 já consultados. */
     private function mapRecibosR4010(int $competenciaId): array
     {
-        $stmt = $this->db->prepare("
-            SELECT nr_recibo_retornado, xml_conteudo
-            FROM arquivos_gerados
-            WHERE competencia_id = ?
-              AND evento = 'R4010'
-              AND nr_recibo_retornado IS NOT NULL
-              AND nr_recibo_retornado <> ''
-            ORDER BY id DESC
-        ");
-        $stmt->execute([$competenciaId]);
         $map = [];
-        foreach ($stmt->fetchAll() as $row) {
+        foreach ($this->arquivos->listXmlsComRecibo($competenciaId, 'R4010') as $row) {
             $xml = (string) ($row['xml_conteudo'] ?? '');
             if (preg_match_all('/<cpfBenef>([^<]+)<\/cpfBenef>/', $xml, $m)) {
                 foreach ($m[1] as $cpf) {
@@ -767,18 +735,8 @@ class GeracaoXmlService
      */
     private function mapRecibosR4020(int $competenciaId): array
     {
-        $stmt = $this->db->prepare("
-            SELECT nr_recibo_retornado, xml_conteudo
-            FROM arquivos_gerados
-            WHERE competencia_id = ?
-              AND evento = 'R4020'
-              AND nr_recibo_retornado IS NOT NULL
-              AND nr_recibo_retornado <> ''
-            ORDER BY id DESC
-        ");
-        $stmt->execute([$competenciaId]);
         $map = [];
-        foreach ($stmt->fetchAll() as $row) {
+        foreach ($this->arquivos->listXmlsComRecibo($competenciaId, 'R4020') as $row) {
             $xml = (string) ($row['xml_conteudo'] ?? '');
             if ($xml === '' || !preg_match('/<cnpjBenef>(\d+)<\/cnpjBenef>/', $xml, $mBenef)) {
                 continue;

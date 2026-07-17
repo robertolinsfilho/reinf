@@ -32,18 +32,11 @@ class EventoController extends BaseController
     private function getComp(int $id): array
     {
         if (!$id) {
-            $stmt = $this->db->prepare("
-                SELECT c.id FROM competencias c
-                JOIN contribuintes co ON co.id = c.contribuinte_id
-                WHERE co.usuario_id = ? AND c.status IN ('aberto', 'fechado')
-                ORDER BY c.periodo DESC LIMIT 2
-            ");
-            $stmt->execute([$this->userId()]);
-            $comps = $stmt->fetchAll();
+            $ids = $this->competencias->listIdsAbertasOuFechadas($this->userId(), 2);
 
-            if (count($comps) === 1) {
+            if (count($ids) === 1) {
                 $uri = strtok($_SERVER['REQUEST_URI'], '?');
-                $this->redirect("{$uri}?competencia_id={$comps[0]['id']}");
+                $this->redirect("{$uri}?competencia_id={$ids[0]}");
             }
             $this->redirect('/competencias', 'Selecione uma competência.', 'info');
         }

@@ -14,6 +14,14 @@ class ProcessoRepository extends Repository
         );
     }
 
+    public function listAtivosByContribuinte(int $contribuinteId): array
+    {
+        return $this->query(
+            "SELECT * FROM r1070_processos WHERE contribuinte_id = ? AND status = 'ativo' ORDER BY data_inclusao DESC",
+            [$contribuinteId]
+        );
+    }
+
     public function listByUser(int $userId): array
     {
         return $this->query("

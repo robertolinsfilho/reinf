@@ -4,11 +4,21 @@ namespace App\Services;
 
 use App\Models\CompetenciaRepository;
 use App\Models\ContribuinteRepository;
+use App\Models\EventoRepository;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 
 class ImportacaoService
 {
-    public function __construct(private \PDO $db) {}
+    private EventoRepository $eventos;
+    private ContribuinteRepository $contribuintes;
+    private CompetenciaRepository $competencias;
+
+    public function __construct(\PDO $db)
+    {
+        $this->eventos       = new EventoRepository($db);
+        $this->contribuintes = new ContribuinteRepository($db);
+        $this->competencias  = new CompetenciaRepository($db);
+    }
 
     public function processar(string $arquivo, string $evento, int $competenciaId, int $maxRows = 5000): array
     {
@@ -95,12 +105,9 @@ class ImportacaoService
         ?int $contribuinteId = null,
         int $maxRows = 5000
     ): array {
-        $contribuintes = new ContribuinteRepository($this->db);
-        $competencias  = new CompetenciaRepository($this->db);
-
         $fallback = null;
         if ($contribuinteId) {
-            $fallback = $contribuintes->findByUser($contribuinteId, $userId);
+            $fallback = $this->contribuintes->findByUser($contribuinteId, $userId);
             if (!$fallback) {
                 throw new \RuntimeException('Contribuinte selecionado não encontrado.');
             }
@@ -139,7 +146,7 @@ class ImportacaoService
 
                 $contribuinte = null;
                 if ($norm['cnpj_empresa'] !== '') {
-                    $contribuinte = $contribuintes->findByCnpjAndUser($norm['cnpj_empresa'], $userId);
+                    $contribuinte = $this->contribuintes->findByCnpjAndUser($norm['cnpj_empresa'], $userId);
                 }
                 if (!$contribuinte) {
                     $contribuinte = $fallback;
@@ -154,7 +161,7 @@ class ImportacaoService
 
                 $chave = $contribuinte['id'] . '|' . $periodo;
                 if (!isset($cacheComp[$chave])) {
-                    $res = $competencias->findOrCreate((int) $contribuinte['id'], $periodo);
+                    $res = $this->competencias->findOrCreate((int) $contribuinte['id'], $periodo);
                     $cacheComp[$chave] = [
                         'id'     => (int) $res['competencia']['id'],
                         'criada' => (bool) $res['criada'],
@@ -197,12 +204,9 @@ class ImportacaoService
         ?int $contribuinteId = null,
         int $maxRows = 5000
     ): array {
-        $contribuintes = new ContribuinteRepository($this->db);
-        $competencias  = new CompetenciaRepository($this->db);
-
         $fallback = null;
         if ($contribuinteId) {
-            $fallback = $contribuintes->findByUser($contribuinteId, $userId);
+            $fallback = $this->contribuintes->findByUser($contribuinteId, $userId);
             if (!$fallback) {
                 throw new \RuntimeException('Contribuinte selecionado não encontrado.');
             }
@@ -240,7 +244,7 @@ class ImportacaoService
 
                 $contribuinte = null;
                 if ($norm['cnpj_empresa'] !== '') {
-                    $contribuinte = $contribuintes->findByCnpjAndUser($norm['cnpj_empresa'], $userId);
+                    $contribuinte = $this->contribuintes->findByCnpjAndUser($norm['cnpj_empresa'], $userId);
                 }
                 if (!$contribuinte) {
                     $contribuinte = $fallback;
@@ -255,7 +259,7 @@ class ImportacaoService
 
                 $chave = $contribuinte['id'] . '|' . $periodo;
                 if (!isset($cacheComp[$chave])) {
-                    $res = $competencias->findOrCreate((int) $contribuinte['id'], $periodo);
+                    $res = $this->competencias->findOrCreate((int) $contribuinte['id'], $periodo);
                     $cacheComp[$chave] = [
                         'id'     => (int) $res['competencia']['id'],
                         'criada' => (bool) $res['criada'],
@@ -308,12 +312,9 @@ class ImportacaoService
             throw new \RuntimeException("Planilha excede o limite de {$maxRows} linhas por importação.");
         }
 
-        $contribuintes = new ContribuinteRepository($this->db);
-        $competencias  = new CompetenciaRepository($this->db);
-
         $fallback = null;
         if ($contribuinteFallbackId) {
-            $fallback = $contribuintes->findByUser($contribuinteFallbackId, $userId);
+            $fallback = $this->contribuintes->findByUser($contribuinteFallbackId, $userId);
             if (!$fallback) {
                 throw new \RuntimeException('Contribuinte selecionado não encontrado.');
             }
@@ -347,7 +348,7 @@ class ImportacaoService
                 $cnpjContri = preg_replace('/\D/', '', (string) ($row['A'] ?? '')) ?: '';
                 $contribuinte = null;
                 if ($cnpjContri !== '') {
-                    $contribuinte = $contribuintes->findByCnpjAndUser($cnpjContri, $userId);
+                    $contribuinte = $this->contribuintes->findByCnpjAndUser($cnpjContri, $userId);
                 }
                 if (!$contribuinte) {
                     $contribuinte = $fallback;
@@ -362,7 +363,7 @@ class ImportacaoService
 
                 $chave = $contribuinte['id'] . '|' . $periodo;
                 if (!isset($cacheComp[$chave])) {
-                    $res = $competencias->findOrCreate((int) $contribuinte['id'], $periodo);
+                    $res = $this->competencias->findOrCreate((int) $contribuinte['id'], $periodo);
                     $cacheComp[$chave] = [
                         'id'      => (int) $res['competencia']['id'],
                         'periodo' => $periodo,
@@ -611,26 +612,20 @@ class ImportacaoService
             return false;
         }
 
-        $stmt = $this->db->prepare("
-            INSERT INTO r2010 (competencia_id, cnpj_prestador, razao_social_prestador, tipo_insc_prestador,
-            num_documento, serie, data_emissao, valor_bruto, valor_base_retencao, valor_retencao,
-            valor_desc_senar, cod_servico, ind_cprb)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ");
-        $stmt->execute([
-            $competenciaId,
-            $norm['cnpj_prestador'],
-            $norm['razao_social'],
-            $norm['tipo_insc'],
-            $norm['num_documento'],
-            $norm['serie'],
-            $norm['data_emissao'],
-            $norm['valor_bruto'],
-            $norm['valor_base'],
-            $norm['valor_retencao'],
-            $norm['valor_senar'],
-            $norm['cod_servico'],
-            $norm['ind_cprb'],
+        $this->eventos->inserir('r2010', [
+            'competencia_id'         => $competenciaId,
+            'cnpj_prestador'         => $norm['cnpj_prestador'],
+            'razao_social_prestador' => $norm['razao_social'],
+            'tipo_insc_prestador'    => $norm['tipo_insc'],
+            'num_documento'          => $norm['num_documento'],
+            'serie'                  => $norm['serie'],
+            'data_emissao'           => $norm['data_emissao'],
+            'valor_bruto'            => $norm['valor_bruto'],
+            'valor_base_retencao'    => $norm['valor_base'],
+            'valor_retencao'         => $norm['valor_retencao'],
+            'valor_desc_senar'       => $norm['valor_senar'],
+            'cod_servico'            => $norm['cod_servico'],
+            'ind_cprb'               => $norm['ind_cprb'],
         ]);
 
         return true;
@@ -776,25 +771,18 @@ class ImportacaoService
             throw new \RuntimeException('Valor bruto deve ser maior que zero.');
         }
 
-        $stmt = $this->db->prepare("
-            INSERT INTO r2055 (
-                competencia_id, tp_insc_adquirente, nr_insc_adquirente,
-                tp_insc_produtor, nr_insc_produtor, ind_opc_cp, ind_aquis,
-                valor_bruto, valor_cp_desc, valor_rat_desc, valor_senar_desc
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ");
-        $stmt->execute([
-            $competenciaId,
-            $norm['tp_insc_adquirente'],
-            $norm['nr_insc_adquirente'],
-            $norm['tp_insc_produtor'],
-            $norm['nr_insc_produtor'],
-            $norm['ind_opc_cp'],
-            $norm['ind_aquis'],
-            $norm['valor_bruto'],
-            $norm['valor_cp_desc'],
-            $norm['valor_rat_desc'],
-            $norm['valor_senar_desc'],
+        $this->eventos->inserir('r2055', [
+            'competencia_id'     => $competenciaId,
+            'tp_insc_adquirente' => $norm['tp_insc_adquirente'],
+            'nr_insc_adquirente' => $norm['nr_insc_adquirente'],
+            'tp_insc_produtor'   => $norm['tp_insc_produtor'],
+            'nr_insc_produtor'   => $norm['nr_insc_produtor'],
+            'ind_opc_cp'         => $norm['ind_opc_cp'],
+            'ind_aquis'          => $norm['ind_aquis'],
+            'valor_bruto'        => $norm['valor_bruto'],
+            'valor_cp_desc'      => $norm['valor_cp_desc'],
+            'valor_rat_desc'     => $norm['valor_rat_desc'],
+            'valor_senar_desc'   => $norm['valor_senar_desc'],
         ]);
 
         return true;
@@ -804,20 +792,15 @@ class ImportacaoService
 
     private function importarR2020(array $row, int $competenciaId): bool
     {
-        $stmt = $this->db->prepare("
-            INSERT INTO r2020 (competencia_id, cnpj_tomador, razao_social_tomador, tipo_insc_tomador,
-            num_documento, data_emissao, valor_bruto, valor_retencao)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        ");
-        $stmt->execute([
-            $competenciaId,
-            preg_replace('/\D/', '', $row['A'] ?? ''),
-            $row['B'] ?? '',
-            $row['C'] ?? '1',
-            $row['D'] ?? '',
-            $this->parseData($row['E'] ?? null),
-            $this->parseMoeda($row['F'] ?? 0),
-            $this->parseMoeda($row['G'] ?? 0),
+        $this->eventos->inserir('r2020', [
+            'competencia_id'      => $competenciaId,
+            'cnpj_tomador'        => preg_replace('/\D/', '', $row['A'] ?? ''),
+            'razao_social_tomador'=> $row['B'] ?? '',
+            'tipo_insc_tomador'   => $row['C'] ?? '1',
+            'num_documento'       => $row['D'] ?? '',
+            'data_emissao'        => $this->parseData($row['E'] ?? null),
+            'valor_bruto'         => $this->parseMoeda($row['F'] ?? 0),
+            'valor_retencao'      => $this->parseMoeda($row['G'] ?? 0),
         ]);
         return true;
     }
@@ -832,19 +815,14 @@ class ImportacaoService
         $base       = $recBruta - $exclusoes;
         $cprb       = round($base * ($aliquota / 100), 2);
 
-        $stmt = $this->db->prepare("
-            INSERT INTO r2060 (competencia_id, cnae, valor_rec_bruta, valor_exclusoes,
-            valor_base_calculo, aliquota, valor_cprb)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        ");
-        $stmt->execute([
-            $competenciaId,
-            $row['A'] ?? '',
-            $recBruta,
-            $exclusoes,
-            $base,
-            $aliquota,
-            $cprb,
+        $this->eventos->inserir('r2060', [
+            'competencia_id'     => $competenciaId,
+            'cnae'               => $row['A'] ?? '',
+            'valor_rec_bruta'    => $recBruta,
+            'valor_exclusoes'    => $exclusoes,
+            'valor_base_calculo' => $base,
+            'aliquota'           => $aliquota,
+            'valor_cprb'         => $cprb,
         ]);
         return true;
     }
@@ -853,21 +831,16 @@ class ImportacaoService
 
     private function importarR4010(array $row, int $competenciaId): bool
     {
-        $stmt = $this->db->prepare("
-            INSERT INTO r4010 (competencia_id, cpf_beneficiario, nome_beneficiario, natureza_rendimento,
-            data_pagamento, valor_bruto, valor_base_ir, valor_ir, valor_deducao)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ");
-        $stmt->execute([
-            $competenciaId,
-            preg_replace('/\D/', '', $row['A'] ?? ''),
-            $row['B'] ?? '',
-            $row['C'] ?? '',
-            $this->parseData($row['D'] ?? null),
-            $this->parseMoeda($row['E'] ?? 0),
-            $this->parseMoeda($row['F'] ?? 0),
-            $this->parseMoeda($row['G'] ?? 0),
-            $this->parseMoeda($row['H'] ?? 0),
+        $this->eventos->inserir('r4010', [
+            'competencia_id'      => $competenciaId,
+            'cpf_beneficiario'    => preg_replace('/\D/', '', $row['A'] ?? ''),
+            'nome_beneficiario'   => $row['B'] ?? '',
+            'natureza_rendimento' => $row['C'] ?? '',
+            'data_pagamento'      => $this->parseData($row['D'] ?? null),
+            'valor_bruto'         => $this->parseMoeda($row['E'] ?? 0),
+            'valor_base_ir'       => $this->parseMoeda($row['F'] ?? 0),
+            'valor_ir'            => $this->parseMoeda($row['G'] ?? 0),
+            'valor_deducao'       => $this->parseMoeda($row['H'] ?? 0),
         ]);
         return true;
     }
@@ -898,46 +871,35 @@ class ImportacaoService
         $vlrCofins = $this->parseMoeda($row['N'] ?? 0);
         $vlrAgreg  = $this->parseMoeda($row['K'] ?? 0);
 
-        $stmt = $this->db->prepare("
-            INSERT INTO r4020 (
-                competencia_id, cnpj_contribuinte, cnpj_beneficiario, num_nfs,
-                periodo_apuracao, natureza_rendimento, cod_tipo_servico, cod_pais,
-                data_pagamento, valor_bruto, valor_base_ir, valor_base_csll, valor_base_cofins,
-                valor_base_pis, valor_base_agreg, valor_ir,
-                vl_csrf_agregado, valor_csll, valor_pis, valor_cofins,
-                identificador_adicional, indicador_fci_scp, cnpj_fci_scp, percentual_scp,
-                indicador_judicial, numero_processo, indicador_origem_recurso, observacoes
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ");
-        $stmt->execute([
-            $competenciaId,
-            preg_replace('/\D/', '', (string) ($row['A'] ?? '')) ?: null,
-            $cnpjBenef,
-            (string) ($row['C'] ?? ''),
-            $this->parseData($row['D'] ?? null),
-            $natRend,
-            $codTipoServico,
-            (string) ($row['H'] ?? '') ?: null,
-            $this->parseData($row['E'] ?? null),
-            $vlrBruto,
-            $this->parseMoeda($row['I'] ?? 0) ?: $vlrBruto,
-            $vlrCsll > 0 ? $vlrBruto : 0,
-            $vlrCofins > 0 ? $vlrBruto : 0,
-            $vlrPis > 0 ? $vlrBruto : 0,
-            $vlrAgreg > 0 ? $vlrBruto : 0,
-            $this->parseMoeda($row['J'] ?? 0),
-            $vlrAgreg,
-            $vlrCsll,
-            $vlrPis,
-            $vlrCofins,
-            (string) ($row['O'] ?? '') ?: null,
-            !empty($row['P']) ? (int) $row['P'] : null,
-            preg_replace('/\D/', '', (string) ($row['Q'] ?? '')) ?: null,
-            !empty($row['R']) ? (float) $row['R'] : null,
-            !empty($row['S']) ? 1 : 0,
-            (string) ($row['T'] ?? '') ?: null,
-            !empty($row['U']) ? (int) $row['U'] : null,
-            (string) ($row['V'] ?? '') ?: null,
+        $this->eventos->inserir('r4020', [
+            'competencia_id'            => $competenciaId,
+            'cnpj_contribuinte'         => preg_replace('/\D/', '', (string) ($row['A'] ?? '')) ?: null,
+            'cnpj_beneficiario'         => $cnpjBenef,
+            'num_nfs'                   => (string) ($row['C'] ?? ''),
+            'periodo_apuracao'          => $this->parseData($row['D'] ?? null),
+            'natureza_rendimento'       => $natRend,
+            'cod_tipo_servico'          => $codTipoServico,
+            'cod_pais'                  => (string) ($row['H'] ?? '') ?: null,
+            'data_pagamento'            => $this->parseData($row['E'] ?? null),
+            'valor_bruto'               => $vlrBruto,
+            'valor_base_ir'             => $this->parseMoeda($row['I'] ?? 0) ?: $vlrBruto,
+            'valor_base_csll'           => $vlrCsll > 0 ? $vlrBruto : 0,
+            'valor_base_cofins'         => $vlrCofins > 0 ? $vlrBruto : 0,
+            'valor_base_pis'            => $vlrPis > 0 ? $vlrBruto : 0,
+            'valor_base_agreg'          => $vlrAgreg > 0 ? $vlrBruto : 0,
+            'valor_ir'                  => $this->parseMoeda($row['J'] ?? 0),
+            'vl_csrf_agregado'          => $vlrAgreg,
+            'valor_csll'                => $vlrCsll,
+            'valor_pis'                 => $vlrPis,
+            'valor_cofins'              => $vlrCofins,
+            'identificador_adicional'   => (string) ($row['O'] ?? '') ?: null,
+            'indicador_fci_scp'         => !empty($row['P']) ? (int) $row['P'] : null,
+            'cnpj_fci_scp'              => preg_replace('/\D/', '', (string) ($row['Q'] ?? '')) ?: null,
+            'percentual_scp'            => !empty($row['R']) ? (float) $row['R'] : null,
+            'indicador_judicial'        => !empty($row['S']) ? 1 : 0,
+            'numero_processo'           => (string) ($row['T'] ?? '') ?: null,
+            'indicador_origem_recurso'  => !empty($row['U']) ? (int) $row['U'] : null,
+            'observacoes'               => (string) ($row['V'] ?? '') ?: null,
         ]);
         return true;
     }
