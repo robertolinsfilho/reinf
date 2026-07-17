@@ -10,6 +10,7 @@ class TransmissaoService
     private array $urlConsulta;
     private int $tpAmb;
     private AssinaturaService $assinatura;
+    private ?int $contribuinteId = null;
 
     public function __construct(private \PDO $db, private ?int $userId = null)
     {
@@ -18,6 +19,12 @@ class TransmissaoService
         $this->urlConsulta = $config['reinf']['ws_consulta'] ?? [];
         $this->tpAmb       = (int) ($config['reinf']['tp_amb'] ?? 2);
         $this->assinatura  = new AssinaturaService($userId);
+    }
+
+    public function setContribuinteId(?int $contribuinteId): void
+    {
+        $this->contribuinteId = $contribuinteId;
+        $this->assinatura->setContribuinteId($contribuinteId);
     }
 
     /**
@@ -249,9 +256,15 @@ class TransmissaoService
     private function extrairCertificadoTemporario(): ?array
     {
         $repo      = new \App\Models\CertificadoRepository($this->db);
-        $certAtivo = $this->userId
-            ? $repo->findAtivoByUser($this->userId)
-            : null;
+        $certAtivo = null;
+        if ($this->userId) {
+            if ($this->contribuinteId) {
+                $certAtivo = $repo->findAtivoByContribuinte($this->contribuinteId, $this->userId);
+            }
+            if (!$certAtivo) {
+                $certAtivo = $repo->findAtivoByUser($this->userId);
+            }
+        }
         if (!$certAtivo) {
             return null;
         }

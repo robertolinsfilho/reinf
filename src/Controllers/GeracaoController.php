@@ -59,7 +59,7 @@ class GeracaoController extends BaseController
             'eventosDisponiveis' => $disponiveis,
             'arquivosGerados'    => $this->arquivos->listByCompetenciaForUser($compId, $this->userId()),
             'recibosSalvos'      => $this->arquivos->listRecibos($compId, null, $this->userId()),
-            'certInfo'           => (new AssinaturaService($this->userId()))->infoCertificado(),
+            'certInfo'           => (new AssinaturaService($this->userId(), (int) $comp['contribuinte_id']))->infoCertificado(),
             'flash'              => $this->getFlash(),
         ]);
     }
@@ -85,14 +85,10 @@ class GeracaoController extends BaseController
 
         $recibosSalvos = [];
         $uid = $this->userId();
-        if (in_array('R4020', $selecionados, true)) {
-            $recibosSalvos = array_merge($recibosSalvos, $this->arquivos->listRecibos($compId, 'R4020', $uid));
-        }
-        if (in_array('R2010', $selecionados, true)) {
-            $recibosSalvos = array_merge($recibosSalvos, $this->arquivos->listRecibos($compId, 'R2010', $uid));
-        }
-        if (in_array('R2055', $selecionados, true)) {
-            $recibosSalvos = array_merge($recibosSalvos, $this->arquivos->listRecibos($compId, 'R2055', $uid));
+        foreach (['R4020', 'R2010', 'R2055', 'R2020', 'R2060', 'R4010'] as $evt) {
+            if (in_array($evt, $selecionados, true)) {
+                $recibosSalvos = array_merge($recibosSalvos, $this->arquivos->listRecibos($compId, $evt, $uid));
+            }
         }
 
         if ($indRetif === 2 && !$nrRecibo && empty($recibosSalvos)) {
@@ -130,7 +126,7 @@ class GeracaoController extends BaseController
 
             // Assinar se solicitado
             if ($assinar) {
-                $assinatura = new AssinaturaService($this->userId());
+                $assinatura = new AssinaturaService($this->userId(), (int) ($comp['contribuinte_id'] ?? 0) ?: null);
                 foreach ($arquivos as &$arq) {
                     $arq['xml']     = $assinatura->assinar($arq['xml']);
                     file_put_contents($arq['caminho'], $arq['xml']);

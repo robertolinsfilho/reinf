@@ -49,20 +49,19 @@ include BASE_PATH . '/src/Views/pages/partials/selecao_contribuinte_competencia.
                                 'R4020' => ['R-4020 – Pagamentos PJ (IRRF/CSRF)', $eventosDisponiveis['R4020'] ?? false],
                                 'R2099' => ['R-2099 – Fechamento Série R-2000', true],
                                 'R4099' => ['R-4099 – Fechamento Série R-4000', true],
-                                'R9000' => ['R-9000 – Exclusão de Evento', true],
                             ];
                             foreach ($eventosList as $cod => [$desc, $temDados]):
-                                $disabled = !$temDados && !in_array($cod, ['R1000','R1070','R2099','R4099','R9000'], true);
+                                $disabled = !$temDados && !in_array($cod, ['R1000','R1070','R2099','R4099'], true);
                             ?>
                             <div class="form-check border rounded p-3 ps-5 <?= $disabled ? 'opacity-50' : '' ?>" style="cursor:<?= $disabled ? 'not-allowed' : 'pointer' ?>">
                                 <input class="form-check-input" type="checkbox" name="eventos[]"
                                        value="<?= $cod ?>" id="ev-<?= $cod ?>"
                                        <?= $disabled ? 'disabled' : '' ?>
-                                       <?= ($temDados && !in_array($cod, ['R1000','R2099','R4099','R9000'], true)) ? 'checked' : '' ?>>
+                                       <?= ($temDados && !in_array($cod, ['R1000','R2099','R4099'], true)) ? 'checked' : '' ?>>
                                 <label class="form-check-label w-100" for="ev-<?= $cod ?>" style="cursor:inherit">
                                     <span class="badge bg-primary me-1"><?= $cod ?></span>
                                     <span style="font-size:.85rem"><?= $desc ?></span>
-                                    <?php if ($temDados && !in_array($cod, ['R1000','R2099','R4099','R9000'], true)): ?>
+                                    <?php if ($temDados && !in_array($cod, ['R1000','R2099','R4099'], true)): ?>
                                         <i class="bi bi-check-circle-fill text-success ms-1" title="Tem registros"></i>
                                     <?php elseif ($disabled): ?>
                                         <small class="text-muted ms-1">(sem registros)</small>
@@ -70,6 +69,9 @@ include BASE_PATH . '/src/Views/pages/partials/selecao_contribuinte_competencia.
                                 </label>
                             </div>
                             <?php endforeach; ?>
+                        </div>
+                        <div class="form-text mt-2">
+                            Para excluir evento já aceito na RFB, use <a href="/transmissao?competencia_id=<?= (int) $competencia['id'] ?>">Transmissão → R-9000</a>.
                         </div>
                     </div>
 
@@ -95,13 +97,15 @@ include BASE_PATH . '/src/Views/pages/partials/selecao_contribuinte_competencia.
                             <?php if (!empty($recibosSalvos)): ?>
                             <select class="form-select form-select-sm font-monospace mb-2"
                                     onchange="document.getElementById('nr-recibo-input').value=this.value">
-                                <option value="">Usar recibo salvo automaticamente (R-2010 / R-2055 / R-4020)</option>
+                                <option value="">Usar recibo salvo automaticamente (por evento)</option>
                                 <?php foreach ($recibosSalvos as $r): ?>
                                 <?php
                                     $detalhe = '';
                                     $xml = (string) ($r['xml_conteudo'] ?? '');
                                     if (($r['evento'] ?? '') === 'R4020' && preg_match('/<cnpjBenef>(\d+)<\/cnpjBenef>/', $xml, $mb)) {
                                         $detalhe = ' — CNPJ ' . $mb[1];
+                                    } elseif (($r['evento'] ?? '') === 'R4010' && preg_match('/<cpfBenef>(\d+)<\/cpfBenef>/', $xml, $mb)) {
+                                        $detalhe = ' — CPF ' . $mb[1];
                                     } elseif (($r['evento'] ?? '') === 'R2010' && preg_match('/<cnpjPrestador>(\d+)<\/cnpjPrestador>/', $xml, $mp)) {
                                         $detalhe = ' — prestador ' . $mp[1];
                                     } elseif (($r['evento'] ?? '') === 'R2055' && preg_match('/<nrInscProd>(\d+)<\/nrInscProd>/', $xml, $mp)) {
@@ -117,7 +121,8 @@ include BASE_PATH . '/src/Views/pages/partials/selecao_contribuinte_competencia.
                                 <?php endforeach; ?>
                             </select>
                             <div class="form-text mb-2">
-                                Se deixar em branco: R-4020/R-2055 usam recibo por beneficiário/produtor; R-2010 usa o último recibo da competência.
+                                Em branco: R-4020/R-2055 usam recibo por beneficiário/produtor;
+                                R-2010/R-2020/R-2060/R-4010 usam o último recibo do evento na competência.
                             </div>
                             <?php endif; ?>
                             <input type="text" name="nr_recibo_original" id="nr-recibo-input" class="form-control form-control-sm font-monospace" placeholder="Recibo da transmissão original">

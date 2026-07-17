@@ -443,6 +443,11 @@ class GeracaoXmlService
         $porTom = [];
         foreach ($registros as $r) $porTom[preg_replace('/\D/', '', $r['cnpj_tomador'])][] = $r;
 
+        $reciboEvt = $this->nrRecibo;
+        if ($this->indRetif === 2 && !$reciboEvt) {
+            $reciboEvt = $this->ultimoReciboEvento((int) $comp['id'], 'R2020');
+        }
+
         $xml = '';
         foreach ($porTom as $cnpjT => $nfs) {
             $totBruto = array_sum(array_column($nfs, 'valor_bruto'));
@@ -454,7 +459,7 @@ class GeracaoXmlService
             $xml .= "                <ideTomador><tpInscTomador>1</tpInscTomador><nrInscTomador>{$cnpjT}</nrInscTomador><vlrTotalBruto>" . $this->fmtVal($totBruto) . "</vlrTotalBruto><vlrTotalBaseRet>" . $this->fmtVal($totBruto) . "</vlrTotalBaseRet><vlrTotalRetPrinc>" . $this->fmtVal($totRet) . "</vlrTotalRetPrinc><vlrTotalRetAdic>" . $this->fmtVal(0) . "</vlrTotalRetAdic><vlrTotalNRetPrinc>" . $this->fmtVal(0) . "</vlrTotalNRetPrinc><vlrTotalNRetAdic>" . $this->fmtVal(0) . "</vlrTotalNRetAdic>\n{$nfsXml}                </ideTomador>\n";
         }
 
-        $body = "        {$this->ideEvento($comp['periodo'], $this->indRetif, $this->nrRecibo)}\n"
+        $body = "        {$this->ideEvento($comp['periodo'], $this->indRetif, $reciboEvt)}\n"
               . "        {$this->ideContri($cnpj)}\n"
               . "        <ideEstabPrest><tpInscEstabPrest>1</tpInscEstabPrest><nrInscEstabPrest>{$cnpj}</nrInscEstabPrest>\n{$xml}        </ideEstabPrest>";
 
@@ -473,6 +478,11 @@ class GeracaoXmlService
         $registros = $stmt->fetchAll();
         if (empty($registros)) throw new \RuntimeException("Nenhum registro R-2060.");
 
+        $reciboEvt = $this->nrRecibo;
+        if ($this->indRetif === 2 && !$reciboEvt) {
+            $reciboEvt = $this->ultimoReciboEvento((int) $comp['id'], 'R2060');
+        }
+
         $xml = '';
         foreach ($registros as $r) {
             $bc = (float)$r['valor_rec_bruta'] - (float)$r['valor_exclusoes'];
@@ -480,7 +490,7 @@ class GeracaoXmlService
             $xml .= "                <tipoCod><codAtivEcon>" . htmlspecialchars($r['cnae']) . "</codAtivEcon><vlrRecBrutaAtiv>" . $this->fmtVal($r['valor_rec_bruta']) . "</vlrRecBrutaAtiv><vlrExcRecBruta>" . $this->fmtVal($r['valor_exclusoes']) . "</vlrExcRecBruta><vlrAdicRecBruta>" . $this->fmtVal(0) . "</vlrAdicRecBruta><vlrBcCPRB>" . $this->fmtVal($bc) . "</vlrBcCPRB><vlrCPRBapur>" . $this->fmtVal($cprb) . "</vlrCPRBapur></tipoCod>\n";
         }
 
-        $body = "        {$this->ideEvento($comp['periodo'], $this->indRetif, $this->nrRecibo)}\n"
+        $body = "        {$this->ideEvento($comp['periodo'], $this->indRetif, $reciboEvt)}\n"
               . "        {$this->ideContri($cnpj)}\n"
               . "        <ideEstab><tpInscEstab>1</tpInscEstab><nrInscEstab>{$cnpj}</nrInscEstab>\n{$xml}        </ideEstab>";
 
@@ -517,6 +527,21 @@ class GeracaoXmlService
         $porB = [];
         foreach ($registros as $r) $porB[preg_replace('/\D/', '', $r['cpf_beneficiario'])][] = $r;
 
+        $recibosPorCpf = $this->mapRecibosR4010((int) $comp['id']);
+        $reciboPadrao  = $this->nrRecibo;
+        if ($this->indRetif === 2 && !$reciboPadrao) {
+            $reciboPadrao = $this->ultimoReciboEvento((int) $comp['id'], 'R4010');
+        }
+
+        // R-4010: um XML por competência (mesmo envelope); recibo único do evento
+        $reciboEvt = $reciboPadrao;
+        if ($this->indRetif === 2 && count($porB) === 1) {
+            $cpfUnico = array_key_first($porB);
+            if (isset($recibosPorCpf[$cpfUnico])) {
+                $reciboEvt = $recibosPorCpf[$cpfUnico];
+            }
+        }
+
         $xml = '';
         foreach ($porB as $cpf => $pagtos) {
             $pgto = '';
@@ -526,7 +551,7 @@ class GeracaoXmlService
             $xml .= "                <ideBenef><cpfBenef>{$cpf}</cpfBenef><nmBenef>" . htmlspecialchars($pagtos[0]['nome_beneficiario'] ?? '') . "</nmBenef><ideEvtAdic><tpIsencao>0</tpIsencao><natRend>" . ($pagtos[0]['natureza_rendimento'] ?? '10001') . "</natRend></ideEvtAdic>\n{$pgto}                </ideBenef>\n";
         }
 
-        $body = "        {$this->ideEvento($comp['periodo'], $this->indRetif, $this->nrRecibo)}\n"
+        $body = "        {$this->ideEvento($comp['periodo'], $this->indRetif, $reciboEvt)}\n"
               . "        {$this->ideContri($cnpj)}\n"
               . "        <ideEstab><tpInscEstab>1</tpInscEstab><nrInscEstab>{$cnpj}</nrInscEstab>\n{$xml}        </ideEstab>";
 
@@ -707,6 +732,34 @@ class GeracaoXmlService
         $stmt->execute([$competenciaId, $evento]);
         $row = $stmt->fetch();
         return $row ? (string) $row['nr_recibo_retornado'] : null;
+    }
+
+    /** Mapa cpfBenef => recibo dos XMLs R-4010 já consultados. */
+    private function mapRecibosR4010(int $competenciaId): array
+    {
+        $stmt = $this->db->prepare("
+            SELECT nr_recibo_retornado, xml_conteudo
+            FROM arquivos_gerados
+            WHERE competencia_id = ?
+              AND evento = 'R4010'
+              AND nr_recibo_retornado IS NOT NULL
+              AND nr_recibo_retornado <> ''
+            ORDER BY id DESC
+        ");
+        $stmt->execute([$competenciaId]);
+        $map = [];
+        foreach ($stmt->fetchAll() as $row) {
+            $xml = (string) ($row['xml_conteudo'] ?? '');
+            if (preg_match_all('/<cpfBenef>([^<]+)<\/cpfBenef>/', $xml, $m)) {
+                foreach ($m[1] as $cpf) {
+                    $cpf = preg_replace('/\D/', '', $cpf) ?? '';
+                    if ($cpf !== '' && !isset($map[$cpf])) {
+                        $map[$cpf] = (string) $row['nr_recibo_retornado'];
+                    }
+                }
+            }
+        }
+        return $map;
     }
 
     /**

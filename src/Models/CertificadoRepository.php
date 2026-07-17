@@ -31,6 +31,25 @@ class CertificadoRepository extends Repository
         ", [$userId]);
     }
 
+    /** Certificado ativo do contribuinte (escopo correto para transmissão). */
+    public function findAtivoByContribuinte(int $contribuinteId, ?int $userId = null): ?array
+    {
+        $sql = "
+            SELECT cert.*
+            FROM certificados cert
+            JOIN contribuintes co ON co.id = cert.contribuinte_id
+            WHERE cert.contribuinte_id = ?
+              AND cert.ativo = 1
+        ";
+        $params = [$contribuinteId];
+        if ($userId !== null) {
+            $sql .= ' AND co.usuario_id = ?';
+            $params[] = $userId;
+        }
+        $sql .= ' ORDER BY cert.id DESC LIMIT 1';
+        return $this->queryOne($sql, $params);
+    }
+
     public function desativarTodosDoUsuario(int $userId, ?int $contribuinteId = null): void
     {
         if ($contribuinteId) {

@@ -11,13 +11,20 @@ class AssinaturaService
     private string $certPath;
     private string $certPass;
     private ?int $userId;
+    private ?int $contribuinteId;
 
-    public function __construct(?int $userId = null)
+    public function __construct(?int $userId = null, ?int $contribuinteId = null)
     {
         $config = \App\Models\AppConfig::get();
         $this->certPath = $config['reinf']['cert_path'] ?? '';
         $this->certPass = $config['reinf']['cert_pass'] ?? '';
         $this->userId   = $userId;
+        $this->contribuinteId = $contribuinteId;
+    }
+
+    public function setContribuinteId(?int $contribuinteId): void
+    {
+        $this->contribuinteId = $contribuinteId;
     }
 
     /**
@@ -152,7 +159,18 @@ class AssinaturaService
         }
         $db   = \App\Models\Database::getInstance();
         $repo = new \App\Models\CertificadoRepository($db);
-        $cert = $repo->findAtivoByUser($this->userId);
+        $cert = null;
+        if ($this->contribuinteId) {
+            $cert = $repo->findAtivoByContribuinte($this->contribuinteId, $this->userId);
+            if (!$cert) {
+                throw new \RuntimeException(
+                    'Nenhum certificado ativo para este contribuinte. '
+                    . 'Em Certificados, envie o PFX vinculado ao CNPJ correto.'
+                );
+            }
+        } else {
+            $cert = $repo->findAtivoByUser($this->userId);
+        }
         if (!$cert) {
             return null;
         }

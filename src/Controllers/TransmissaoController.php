@@ -32,7 +32,16 @@ class TransmissaoController extends BaseController
         $compId      = (int) $this->get('competencia_id');
         $competencia = $compId ? $this->competencias->findWithContribuinte($compId, $uid) : null;
 
-        $certAtivo = $this->certificados->findAtivoByUser($uid);
+        $certAtivo = null;
+        if ($competencia) {
+            $certAtivo = $this->certificados->findAtivoByContribuinte(
+                (int) $competencia['contribuinte_id'],
+                $uid
+            );
+        }
+        if (!$certAtivo) {
+            $certAtivo = $this->certificados->findAtivoByUser($uid);
+        }
         $certInfo  = null;
         if ($certAtivo) {
             $validade = strtotime($certAtivo['validade']);
@@ -89,7 +98,9 @@ class TransmissaoController extends BaseController
         }
 
         $service       = new TransmissaoService($this->db, $uid);
-        $certAtivo     = $this->certificados->findAtivoByUser($uid);
+        $service->setContribuinteId((int) $comp['contribuinte_id']);
+        $certAtivo     = $this->certificados->findAtivoByContribuinte((int) $comp['contribuinte_id'], $uid)
+            ?: $this->certificados->findAtivoByUser($uid);
         $temCertValido = $certAtivo && strtotime($certAtivo['validade']) > time();
         $tpAmb         = (int) ($this->config['reinf']['tp_amb'] ?? 2);
         $allowSim      = !empty($this->config['security']['allow_simulated_transmission']);
@@ -150,7 +161,9 @@ class TransmissaoController extends BaseController
             $this->redirect('/transmissao', 'Competência não encontrada.', 'erro');
         }
 
-        $resultado = (new TransmissaoService($this->db, $uid))->consultarProtocolo($comp['cnpj'], $protocolo);
+        $svc = new TransmissaoService($this->db, $uid);
+        $svc->setContribuinteId((int) $comp['contribuinte_id']);
+        $resultado = $svc->consultarProtocolo($comp['cnpj'], $protocolo);
 
         $this->logs->registrarConsulta($compId, $uid, $protocolo, $resultado, $this->config['reinf']['tp_amb'] ?? 2);
 
@@ -231,7 +244,8 @@ class TransmissaoController extends BaseController
             );
         }
 
-        $certAtivo     = $this->certificados->findAtivoByUser($uid);
+        $certAtivo     = $this->certificados->findAtivoByContribuinte((int) $comp['contribuinte_id'], $uid)
+            ?: $this->certificados->findAtivoByUser($uid);
         $temCertValido = $certAtivo && strtotime($certAtivo['validade']) > time();
         $tpAmb         = (int) ($this->config['reinf']['tp_amb'] ?? 2);
         $allowSim      = !empty($this->config['security']['allow_simulated_transmission']);
@@ -259,6 +273,7 @@ class TransmissaoController extends BaseController
         }
 
         $service   = new TransmissaoService($this->db, $uid);
+        $service->setContribuinteId((int) $comp['contribuinte_id']);
         $resultado = $temCertValido
             ? $service->enviarLote($comp['cnpj'], $xmls, assinar: true)
             : $service->enviarSimulado($comp['cnpj'], $xmls);

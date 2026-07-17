@@ -149,9 +149,9 @@ if (isset($_SESSION['flash'])) { $flash = $_SESSION['flash']; unset($_SESSION['f
                 <ul class="mb-0 ps-3">
                     <li>O certificado digital A1 (arquivo PFX/P12) é necessário para <strong>assinar</strong> e <strong>transmitir</strong> eventos à Receita Federal.</li>
                     <li>Sem certificado, o sistema gera os XMLs normalmente, mas os envios operam em <strong>modo simulação</strong>.</li>
-                    <li>O certificado deve estar no nome do contribuinte (CNPJ) que fará a transmissão.</li>
+                    <li>Envie o certificado <strong>vinculado ao contribuinte</strong> (CNPJ) que fará a transmissão — a assinatura usa o cert daquele CNPJ.</li>
                     <li>Certificados A1 têm validade de 1 ano. O sistema alertará quando estiver próximo do vencimento.</li>
-                    <li>A senha do certificado é usada apenas no momento do upload para validação — não é armazenada.</li>
+                    <li>A senha do PFX é validada no upload e fica <strong>armazenada criptografada</strong> (AES-256) para assinar/transmitir sem pedir de novo. Protegida pelo <code>APP_SECRET</code> do servidor.</li>
                 </ul>
             </div>
         </div>
