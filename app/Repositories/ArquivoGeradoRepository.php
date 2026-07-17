@@ -119,19 +119,23 @@ class ArquivoGeradoRepository extends Repository
             $atualizados += $stmt->rowCount();
         }
 
-        if ($atualizados === 0 && !empty($recibosOrdem)) {
+        // Fallback por ordem: só arquivos do protocolo ainda sem recibo
+        if (!empty($recibosOrdem)) {
             $arquivos = $this->query(
                 "SELECT id FROM arquivos_gerados
                  WHERE competencia_id = ? AND protocolo = ?
+                   AND (nr_recibo_retornado IS NULL OR nr_recibo_retornado = '')
                  ORDER BY id ASC",
                 [$competenciaId, $protocolo]
             );
-            foreach ($arquivos as $i => $arq) {
+            $i = 0;
+            foreach ($arquivos as $arq) {
                 if (!isset($recibosOrdem[$i])) {
                     break;
                 }
                 $this->update((int) $arq['id'], ['nr_recibo_retornado' => $recibosOrdem[$i]]);
                 $atualizados++;
+                $i++;
             }
         }
 

@@ -378,6 +378,7 @@ class GeracaoXmlService
                 : '0';
 
             $nfsXml = '';
+            $chavesNfs = [];
             foreach ($nfs as $n) {
                 // Leiaute: vlrBruto deve ser > 0 (MS0030 em valores negativos)
                 $vBruto = (float) ($n['valor_bruto'] ?? 0);
@@ -408,6 +409,34 @@ class GeracaoXmlService
                 $numDocto = trim((string) ($n['num_documento'] ?? ''));
                 $numDocto = $numDocto !== '' ? $numDocto : '1';
                 $dtEm     = $n['data_emissao'] ?: ($comp['periodo'] . '-01');
+
+                // MS1076: serie+numDocto deve ser único dentro do evento
+                $chaveNfs = $serie . '|' . $numDocto;
+                if (isset($chavesNfs[$chaveNfs])) {
+                    $prev = $chavesNfs[$chaveNfs];
+                    // Linha idêntica (reimport): ignora
+                    if (
+                        abs($prev['bruto'] - $vBruto) < 0.005
+                        && abs($prev['ret'] - $vRet) < 0.005
+                        && $prev['dt'] === $dtEm
+                        && $prev['tp'] === $tpServ
+                    ) {
+                        continue;
+                    }
+                    $sufixo = (string) (int) ($n['id'] ?? 0);
+                    if ($sufixo === '0') {
+                        $sufixo = (string) (count($chavesNfs) + 1);
+                    }
+                    $base = substr($numDocto, 0, max(1, 15 - 1 - strlen($sufixo)));
+                    $numDocto = $base . '-' . $sufixo;
+                    $chaveNfs = $serie . '|' . $numDocto;
+                }
+                $chavesNfs[$chaveNfs] = [
+                    'bruto' => $vBruto,
+                    'ret'   => $vRet,
+                    'dt'    => $dtEm,
+                    'tp'    => $tpServ,
+                ];
 
                 $totBruto += $vBruto;
                 $totBase  += $vBase;
@@ -622,6 +651,7 @@ class GeracaoXmlService
             $totBase  = 0.0;
             $totRet   = 0.0;
             $nfsXml   = '';
+            $chavesNfs = [];
 
             foreach ($nfs as $n) {
                 $vBruto = (float) ($n['valor_bruto'] ?? 0);
@@ -642,6 +672,27 @@ class GeracaoXmlService
                 $numDocto = trim((string) ($n['num_documento'] ?? ''));
                 $numDocto = $numDocto !== '' ? $numDocto : '1';
                 $dtEm     = $n['data_emissao'] ?: ($comp['periodo'] . '-01');
+
+                // MS1076: serie+numDocto único no evento
+                $chaveNfs = $serie . '|' . $numDocto;
+                if (isset($chavesNfs[$chaveNfs])) {
+                    $prev = $chavesNfs[$chaveNfs];
+                    if (
+                        abs($prev['bruto'] - $vBruto) < 0.005
+                        && abs($prev['ret'] - $vRet) < 0.005
+                        && $prev['dt'] === $dtEm
+                    ) {
+                        continue;
+                    }
+                    $sufixo = (string) (int) ($n['id'] ?? 0);
+                    if ($sufixo === '0') {
+                        $sufixo = (string) (count($chavesNfs) + 1);
+                    }
+                    $base = substr($numDocto, 0, max(1, 15 - 1 - strlen($sufixo)));
+                    $numDocto = $base . '-' . $sufixo;
+                    $chaveNfs = $serie . '|' . $numDocto;
+                }
+                $chavesNfs[$chaveNfs] = ['bruto' => $vBruto, 'ret' => $vRet, 'dt' => $dtEm];
 
                 $totBruto += $vBruto;
                 $totBase  += $vBase;
