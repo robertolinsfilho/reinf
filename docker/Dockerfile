@@ -24,7 +24,8 @@ WORKDIR /var/www/html
 
 COPY . .
 
-RUN composer install --no-dev --optimize-autoloader --no-interaction
+RUN git config --global --add safe.directory /var/www/html \
+    && composer install --no-dev --optimize-autoloader --no-interaction
 
 RUN mkdir -p /var/www/html/storage/xml \
     && mkdir -p /var/www/html/storage/uploads \
