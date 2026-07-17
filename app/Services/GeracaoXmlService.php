@@ -165,8 +165,8 @@ class GeracaoXmlService
         $id   = $this->gerarId($cnpj);
 
         $classif = str_pad(preg_replace('/\D/', '', (string) ($comp['classificacao_tributos'] ?? '99')) ?? '99', 2, '0', STR_PAD_LEFT);
-        $tabela08 = array_keys(config('reinf.class_trib', []));
-        if (!in_array($classif, $tabela08, true)) {
+        $classTribMap = config('reinf.class_trib', []);
+        if (!is_array($classTribMap) || !array_key_exists($classif, $classTribMap)) {
             throw new \RuntimeException('Classificação tributária inválida (Tabela 08). Atualize o contribuinte.');
         }
 

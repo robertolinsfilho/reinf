@@ -69,7 +69,7 @@ class ContribuinteController extends Controller
         ];
 
         $redirect = $id ? "/contribuintes/editar?id={$id}" : '/contribuintes/novo';
-        $tabela08 = array_keys(config('reinf.class_trib', []));
+        $classTribMap = config('reinf.class_trib', []);
 
         if ($dados['cnpj'] === '' || $dados['razao_social'] === '') {
             return $this->flashRedirect($redirect, 'CNPJ e Razão Social são obrigatórios.', 'erro');
@@ -83,7 +83,8 @@ class ContribuinteController extends Controller
             return $this->flashRedirect($redirect, 'CNPJ/CPF inválido.', 'erro');
         }
 
-        if (!in_array($classTrib, $tabela08, true)) {
+        // array_key_exists: PHP cast keys "01"/"99" to int — in_array strict falha
+        if (!is_array($classTribMap) || !array_key_exists($classTrib, $classTribMap)) {
             return $this->flashRedirect($redirect, 'Classificação tributária inválida (Tabela 08).', 'erro');
         }
 
