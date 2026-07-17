@@ -122,26 +122,22 @@ class TransmissaoService
             }
         }
 
-        // Retorno atual (evtTotal): idEv + nrRecArqBase
+        // Retorno atual (evtTotal): idEv + nrRecArqBase no mesmo infoRecEv
         if (preg_match_all(
-            '/<infoRecEv>[\s\S]*?<nrRecArqBase>([^<]+)<\/nrRecArqBase>[\s\S]*?<idEv>(ID[0-9A-Za-z]+)<\/idEv>[\s\S]*?<\/infoRecEv>/',
+            '/<infoRecEv>\s*(.*?)\s*<\/infoRecEv>/s',
             $body,
-            $paresBase,
+            $blocos,
             PREG_SET_ORDER
         )) {
-            foreach ($paresBase as $par) {
-                $recibosPorId[$par[2]] = $par[1];
-            }
-        }
-        // Ordem inversa das tags dentro de infoRecEv
-        if (preg_match_all(
-            '/<infoRecEv>[\s\S]*?<idEv>(ID[0-9A-Za-z]+)<\/idEv>[\s\S]*?<nrRecArqBase>([^<]+)<\/nrRecArqBase>[\s\S]*?<\/infoRecEv>/',
-            $body,
-            $paresBase2,
-            PREG_SET_ORDER
-        )) {
-            foreach ($paresBase2 as $par) {
-                $recibosPorId[$par[1]] = $par[2];
+            foreach ($blocos as $bloco) {
+                $inner = $bloco[1];
+                if (
+                    !preg_match('/<idEv>(ID[0-9A-Za-z]+)<\/idEv>/', $inner, $mId)
+                    || !preg_match('/<nrRecArqBase>([^<]+)<\/nrRecArqBase>/', $inner, $mRec)
+                ) {
+                    continue;
+                }
+                $recibosPorId[$mId[1]] = $mRec[1];
             }
         }
 
