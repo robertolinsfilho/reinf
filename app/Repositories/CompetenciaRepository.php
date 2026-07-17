@@ -234,7 +234,7 @@ class CompetenciaRepository extends Repository
     }
 
     /**
-     * Periódicos com dados locais que ainda não têm XML enviado (protocolo).
+     * Periódicos com dados locais que ainda não têm XML aceito (recibo RFB).
      *
      * @return list<string>
      */
@@ -246,7 +246,8 @@ class CompetenciaRepository extends Repository
                 SELECT 1 FROM arquivos_gerados
                 WHERE competencia_id = ?
                   AND evento = ?
-                  AND protocolo IS NOT NULL AND protocolo <> ''
+                  AND nr_recibo_retornado IS NOT NULL
+                  AND nr_recibo_retornado <> ''
                 LIMIT 1
             ");
             $stmt->execute([$competenciaId, $evento]);
