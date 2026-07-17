@@ -13,8 +13,12 @@
     <div class="card-body p-4">
         <form action="/contribuintes/salvar" method="POST" id="formContribuinte">
             @csrf
-            @if($contribuinte)
-            <input type="hidden" name="id" value="{{ $contribuinte['id'] }}">
+            @php
+                $c = $contribuinte ?? [];
+                $val = fn (string $key, mixed $default = '') => old($key, $c[$key] ?? $default);
+            @endphp
+            @if(!empty($c['id']) || old('id'))
+            <input type="hidden" name="id" value="{{ old('id', $c['id'] ?? '') }}">
             @endif
 
             <h6 class="mb-3"><i class="bi bi-building me-1"></i> Dados do contribuinte</h6>
@@ -24,9 +28,10 @@
                     <select name="tipo_contribuinte" id="tipoContrib" class="form-select">
                         @php
                         $tipos = ['1'=>'CNPJ','2'=>'CPF'];
+                        $tipoAtual = (string) $val('tipo_contribuinte', '1');
                         @endphp
                         @foreach($tipos as $v => $l)
-                        <option value="{{ $v }}" {{ ($contribuinte['tipo_contribuinte'] ?? '1') == $v ? 'selected' : '' }}>
+                        <option value="{{ $v }}" {{ $tipoAtual == $v ? 'selected' : '' }}>
                             {{ $v }} – {{ $l }}
                         </option>
                         @endforeach
@@ -36,7 +41,7 @@
                 <div class="col-md-4">
                     <label class="form-label" id="labelInscricao">CNPJ / CPF *</label>
                     <input type="text" name="cnpj" id="inputInscricao" class="form-control font-monospace"
-                           value="{{ $contribuinte['cnpj'] ?? '' }}"
+                           value="{{ $val('cnpj') }}"
                            placeholder="00.000.000/0001-00" required>
                     <div id="feedbackValidacao" class="form-text"></div>
                 </div>
@@ -46,7 +51,7 @@
                     <select name="classificacao_tributos" class="form-select" required>
                         @php
                         $classifs = config('reinf.class_trib', []);
-                        $classAtual = $contribuinte['classificacao_tributos'] ?? '99';
+                        $classAtual = (string) $val('classificacao_tributos', '99');
                         @endphp
                         @foreach($classifs as $v => $l)
                         <option value="{{ $v }}" {{ $classAtual == $v ? 'selected' : '' }}>
@@ -60,13 +65,13 @@
                 <div class="col-md-8">
                     <label class="form-label">Razão Social *</label>
                     <input type="text" name="razao_social" class="form-control"
-                           value="{{ $contribuinte['razao_social'] ?? '' }}"
+                           value="{{ $val('razao_social') }}"
                            placeholder="Nome completo ou razão social" required>
                 </div>
                 <div class="col-md-4">
                     <label class="form-label">Nome Fantasia</label>
                     <input type="text" name="nome_fantasia" class="form-control"
-                           value="{{ $contribuinte['nome_fantasia'] ?? '' }}"
+                           value="{{ $val('nome_fantasia') }}"
                            placeholder="Opcional">
                 </div>
             </div>
@@ -76,23 +81,26 @@
             <div class="row g-3">
                 <div class="col-md-6">
                     <label class="form-label">Obrigatoriedade ECD *</label>
+                    @php $indEsc = (int) $val('ind_escrituracao', 0); @endphp
                     <select name="ind_escrituracao" class="form-select">
-                        <option value="0" {{ (int)($contribuinte['ind_escrituracao'] ?? 0) === 0 ? 'selected' : '' }}>0 – Não obrigada à ECD</option>
-                        <option value="1" {{ (int)($contribuinte['ind_escrituracao'] ?? 0) === 1 ? 'selected' : '' }}>1 – Obrigada à ECD</option>
+                        <option value="0" {{ $indEsc === 0 ? 'selected' : '' }}>0 – Não obrigada à ECD</option>
+                        <option value="1" {{ $indEsc === 1 ? 'selected' : '' }}>1 – Obrigada à ECD</option>
                     </select>
                 </div>
                 <div class="col-md-6">
                     <label class="form-label">Desoneração da folha *</label>
+                    @php $indDes = (int) $val('ind_desoneracao', 0); @endphp
                     <select name="ind_desoneracao" class="form-select">
-                        <option value="0" {{ (int)($contribuinte['ind_desoneracao'] ?? 0) === 0 ? 'selected' : '' }}>0 – Não aplicável</option>
-                        <option value="1" {{ (int)($contribuinte['ind_desoneracao'] ?? 0) === 1 ? 'selected' : '' }}>1 – Lei 12.546/2011 (só classTrib 02, 03 ou 99)</option>
+                        <option value="0" {{ $indDes === 0 ? 'selected' : '' }}>0 – Não aplicável</option>
+                        <option value="1" {{ $indDes === 1 ? 'selected' : '' }}>1 – Lei 12.546/2011 (só classTrib 02, 03 ou 99)</option>
                     </select>
                 </div>
                 <div class="col-md-6">
                     <label class="form-label">Acordo isenção de multa *</label>
+                    @php $indAco = (int) $val('ind_acordo_isen_multa', 0); @endphp
                     <select name="ind_acordo_isen_multa" class="form-select">
-                        <option value="0" {{ (int)($contribuinte['ind_acordo_isen_multa'] ?? 0) === 0 ? 'selected' : '' }}>0 – Sem acordo</option>
-                        <option value="1" {{ (int)($contribuinte['ind_acordo_isen_multa'] ?? 0) === 1 ? 'selected' : '' }}>1 – Com acordo (só classTrib 60)</option>
+                        <option value="0" {{ $indAco === 0 ? 'selected' : '' }}>0 – Sem acordo</option>
+                        <option value="1" {{ $indAco === 1 ? 'selected' : '' }}>1 – Com acordo (só classTrib 60)</option>
                     </select>
                 </div>
                 <div class="col-md-6">
@@ -106,9 +114,10 @@
                             3 => '3 – Cisão',
                             4 => '4 – Incorporação',
                         ];
+                        $indSit = (int) $val('ind_sit_pj', 0);
                         @endphp
                         @foreach($sits as $v => $l)
-                        <option value="{{ $v }}" {{ (int)($contribuinte['ind_sit_pj'] ?? 0) === $v ? 'selected' : '' }}>{{ $l }}</option>
+                        <option value="{{ $v }}" {{ $indSit === $v ? 'selected' : '' }}>{{ $l }}</option>
                         @endforeach
                     </select>
                 </div>
@@ -123,26 +132,26 @@
                 <div class="col-md-6">
                     <label class="form-label">Nome do contato *</label>
                     <input type="text" name="nome_contato" class="form-control"
-                           value="{{ $contribuinte['nome_contato'] ?? '' }}"
+                           value="{{ $val('nome_contato') }}"
                            maxlength="70" placeholder="Nome completo" required>
                 </div>
                 <div class="col-md-6">
                     <label class="form-label">CPF do contato *</label>
                     <input type="text" name="cpf_contato" id="inputCpfContato" class="form-control font-monospace"
-                           value="{{ $contribuinte['cpf_contato'] ?? '' }}"
+                           value="{{ $val('cpf_contato') }}"
                            placeholder="000.000.000-00" maxlength="14" required>
                 </div>
                 <div class="col-md-6">
                     <label class="form-label">Telefone (com DDD) *</label>
                     <input type="text" name="telefone" id="inputTelefone" class="form-control font-monospace"
-                           value="{{ $contribuinte['telefone'] ?? '' }}"
+                           value="{{ $val('telefone') }}"
                            placeholder="(00) 00000-0000" maxlength="15" required>
                     <div class="form-text">Mínimo 10 dígitos (DDD + número).</div>
                 </div>
                 <div class="col-md-6">
                     <label class="form-label">E-mail</label>
                     <input type="email" name="email" class="form-control"
-                           value="{{ $contribuinte['email'] ?? '' }}"
+                           value="{{ $val('email') }}"
                            maxlength="60" placeholder="contato@empresa.com.br">
                 </div>
             </div>

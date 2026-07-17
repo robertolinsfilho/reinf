@@ -71,28 +71,31 @@ class ContribuinteController extends Controller
         $redirect = $id ? "/contribuintes/editar?id={$id}" : '/contribuintes/novo';
         $classTribMap = config('reinf.class_trib', []);
 
+        $erro = function (string $msg) use ($redirect) {
+            return $this->flashRedirect($redirect, $msg, 'erro', withInput: true);
+        };
+
         if ($dados['cnpj'] === '' || $dados['razao_social'] === '') {
-            return $this->flashRedirect($redirect, 'CNPJ e Razão Social são obrigatórios.', 'erro');
+            return $erro('CNPJ e Razão Social são obrigatórios.');
         }
 
         if (!in_array($dados['tipo_contribuinte'], ['1', '2'], true)) {
-            return $this->flashRedirect($redirect, 'Tipo de inscrição inválido.', 'erro');
+            return $erro('Tipo de inscrição inválido.');
         }
 
         if (!ValidacaoService::cnpjOuCpf($dados['cnpj'])) {
-            return $this->flashRedirect($redirect, 'CNPJ/CPF inválido.', 'erro');
+            return $erro('CNPJ/CPF inválido.');
         }
 
-        // array_key_exists: PHP cast keys "01"/"99" to int — in_array strict falha
         if (!is_array($classTribMap) || !array_key_exists($classTrib, $classTribMap)) {
-            return $this->flashRedirect($redirect, 'Classificação tributária inválida (Tabela 08).', 'erro');
+            return $erro('Classificação tributária inválida (Tabela 08).');
         }
 
         if (in_array($classTrib, ['21', '22'], true) && $dados['tipo_contribuinte'] !== '2') {
-            return $this->flashRedirect($redirect, 'Códigos 21/22 exigem inscrição CPF (tpInsc=2).', 'erro');
+            return $erro('Códigos 21/22 exigem inscrição CPF (tpInsc=2).');
         }
         if (!in_array($classTrib, ['21', '22'], true) && $dados['tipo_contribuinte'] !== '1') {
-            return $this->flashRedirect($redirect, 'Esta classificação tributária exige inscrição CNPJ (tpInsc=1).', 'erro');
+            return $erro('Esta classificação tributária exige inscrição CNPJ (tpInsc=1).');
         }
 
         if (!in_array($dados['ind_escrituracao'], [0, 1], true)
@@ -100,31 +103,31 @@ class ContribuinteController extends Controller
             || !in_array($dados['ind_acordo_isen_multa'], [0, 1], true)
             || !in_array($dados['ind_sit_pj'], [0, 1, 2, 3, 4], true)
         ) {
-            return $this->flashRedirect($redirect, 'Indicadores do R-1000 inválidos.', 'erro');
+            return $erro('Indicadores do R-1000 inválidos.');
         }
 
         if ($dados['ind_desoneracao'] === 1 && !in_array($classTrib, ['02', '03', '99'], true)) {
-            return $this->flashRedirect($redirect, 'Desoneração da folha só é permitida com classTrib 02, 03 ou 99.', 'erro');
+            return $erro('Desoneração da folha só é permitida com classTrib 02, 03 ou 99.');
         }
 
         if ($dados['ind_acordo_isen_multa'] === 1 && $classTrib !== '60') {
-            return $this->flashRedirect($redirect, 'Acordo de isenção de multa só é permitido com classTrib 60.', 'erro');
+            return $erro('Acordo de isenção de multa só é permitido com classTrib 60.');
         }
 
         if ($dados['nome_contato'] === '' || $dados['cpf_contato'] === '') {
-            return $this->flashRedirect($redirect, 'Nome e CPF do contato são obrigatórios para o R-1000.', 'erro');
+            return $erro('Nome e CPF do contato são obrigatórios para o R-1000.');
         }
 
         if (!ValidacaoService::validarCpf($dados['cpf_contato'])) {
-            return $this->flashRedirect($redirect, 'CPF do contato inválido.', 'erro');
+            return $erro('CPF do contato inválido.');
         }
 
         if ($dados['telefone'] === null || strlen($dados['telefone']) < 10 || strlen($dados['telefone']) > 13) {
-            return $this->flashRedirect($redirect, 'Telefone do contato deve ter DDD e no mínimo 10 dígitos.', 'erro');
+            return $erro('Telefone do contato deve ter DDD e no mínimo 10 dígitos.');
         }
 
         if ($dados['email'] !== null && $dados['email'] !== '' && !filter_var($dados['email'], FILTER_VALIDATE_EMAIL)) {
-            return $this->flashRedirect($redirect, 'E-mail do contato inválido.', 'erro');
+            return $erro('E-mail do contato inválido.');
         }
 
         return $this->safeExecute(function () use ($id, $uid, $dados) {
@@ -134,7 +137,7 @@ class ContribuinteController extends Controller
             }
             $this->repo->criar($uid, $dados);
             return $this->flashRedirect('/contribuintes', 'Contribuinte cadastrado.', 'sucesso');
-        }, $redirect);
+        }, $redirect, 'Erro', withInput: true);
     }
 
     public function excluir(Request $request)

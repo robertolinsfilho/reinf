@@ -64,9 +64,10 @@ abstract class Controller
         ]));
     }
 
-    protected function flashRedirect(string $url, string $mensagem, string $tipo = 'info'): RedirectResponse
+    protected function flashRedirect(string $url, string $mensagem, string $tipo = 'info', bool $withInput = false): RedirectResponse
     {
-        return redirect($url)->with('flash', ['tipo' => $tipo, 'mensagem' => $mensagem]);
+        $redirect = redirect($url)->with('flash', ['tipo' => $tipo, 'mensagem' => $mensagem]);
+        return $withInput ? $redirect->withInput() : $redirect;
     }
 
     protected function flash(string $tipo, string $mensagem): void
@@ -105,19 +106,19 @@ abstract class Controller
         return htmlspecialchars(trim((string) $value), ENT_QUOTES, 'UTF-8');
     }
 
-    protected function safeExecute(callable $fn, string $redirectUrl, string $errorPrefix = 'Erro'): mixed
+    protected function safeExecute(callable $fn, string $redirectUrl, string $errorPrefix = 'Erro', bool $withInput = false): mixed
     {
         try {
             return $fn();
         } catch (\PDOException $e) {
             report($e);
-            return $this->flashRedirect($redirectUrl, "{$errorPrefix}: falha ao gravar dados.", 'erro');
+            return $this->flashRedirect($redirectUrl, "{$errorPrefix}: falha ao gravar dados.", 'erro', $withInput);
         } catch (\RuntimeException $e) {
             report($e);
-            return $this->flashRedirect($redirectUrl, "{$errorPrefix}: " . $e->getMessage(), 'erro');
+            return $this->flashRedirect($redirectUrl, "{$errorPrefix}: " . $e->getMessage(), 'erro', $withInput);
         } catch (\Exception $e) {
             report($e);
-            return $this->flashRedirect($redirectUrl, "{$errorPrefix}: não foi possível concluir a operação.", 'erro');
+            return $this->flashRedirect($redirectUrl, "{$errorPrefix}: não foi possível concluir a operação.", 'erro', $withInput);
         }
     }
 
