@@ -164,6 +164,115 @@ class CompetenciaRepository extends Repository
         ]);
     }
 
+    /**
+     * Eventos de tabela (R-1000/R-1070) e exclusão (R-9000) NÃO fecham a competência.
+     * Status "transmitido" só quando todos os periódicos com dados locais já foram enviados.
+     *
+     * @param list<string> $eventosEnviadosNesteLote ex.: ['R1000'] ou ['R2010','R2010']
+     */
+    public function sincronizarStatusTransmissao(int $id, array $eventosEnviadosNesteLote = [], ?string $protocolo = null): void
+    {
+        $comp = $this->find($id);
+        if (!$comp) {
+            return;
+        }
+
+        // Nunca promover só por evento de tabela/exclusão
+        $soTabelaOuExclusao = $eventosEnviadosNesteLote !== []
+            && $this->apenasEventosNaoPeriodicos($eventosEnviadosNesteLote);
+
+        $pendentes = $this->eventosPeriodicosPendentesDeEnvio($id);
+
+        if ($pendentes === []) {
+            $temPeriodicoComDados = $this->eventosPeriodicosComDados($id) !== [];
+            if ($temPeriodicoComDados) {
+                // Todos os periódicos com dados já têm protocolo → transmitido
+                $this->marcarTransmitido($id, $protocolo ?: (string) ($comp['num_recibo'] ?? ''));
+                return;
+            }
+            // Só R-1000 (ou sem periódicos): mantém/reabre como aberto (não "transmitido")
+            if (($comp['status'] ?? '') === 'transmitido' || $soTabelaOuExclusao) {
+                $this->update($id, [
+                    'status'     => 'aberto',
+                    'data_envio' => null,
+                    'num_recibo' => null,
+                ]);
+            }
+            return;
+        }
+
+        // Ainda falta enviar algum periódico → não fica como transmitido
+        if (($comp['status'] ?? '') === 'transmitido') {
+            $this->update($id, [
+                'status'     => 'aberto',
+                'data_envio' => null,
+                'num_recibo' => null,
+            ]);
+        }
+    }
+
+    /** @return list<string> ex.: ['R2010','R4020'] */
+    public function eventosPeriodicosComDados(int $competenciaId): array
+    {
+        $map = [
+            'R2010' => 'r2010',
+            'R2020' => 'r2020',
+            'R2055' => 'r2055',
+            'R2060' => 'r2060',
+            'R4010' => 'r4010',
+            'R4020' => 'r4020',
+        ];
+        $comDados = [];
+        foreach ($map as $evento => $tabela) {
+            $stmt = $this->db->prepare("SELECT 1 FROM {$tabela} WHERE competencia_id = ? LIMIT 1");
+            $stmt->execute([$competenciaId]);
+            if ($stmt->fetchColumn()) {
+                $comDados[] = $evento;
+            }
+        }
+        return $comDados;
+    }
+
+    /**
+     * Periódicos com dados locais que ainda não têm XML enviado (protocolo).
+     *
+     * @return list<string>
+     */
+    public function eventosPeriodicosPendentesDeEnvio(int $competenciaId): array
+    {
+        $pendentes = [];
+        foreach ($this->eventosPeriodicosComDados($competenciaId) as $evento) {
+            $stmt = $this->db->prepare("
+                SELECT 1 FROM arquivos_gerados
+                WHERE competencia_id = ?
+                  AND evento = ?
+                  AND protocolo IS NOT NULL AND protocolo <> ''
+                LIMIT 1
+            ");
+            $stmt->execute([$competenciaId, $evento]);
+            if (!$stmt->fetchColumn()) {
+                $pendentes[] = $evento;
+            }
+        }
+        return $pendentes;
+    }
+
+    /** @param list<string> $eventos */
+    private function apenasEventosNaoPeriodicos(array $eventos): bool
+    {
+        $naoPeriodicos = ['R1000', 'R1070', 'R9000'];
+        foreach ($eventos as $ev) {
+            $norm = strtoupper(str_replace('-', '', trim((string) $ev)));
+            if ($norm !== '' && !str_starts_with($norm, 'R')) {
+                $norm = 'R' . preg_replace('/\D/', '', $norm);
+            }
+            if (!in_array($norm, $naoPeriodicos, true)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     /** Reabre competência se não houver mais XMLs com protocolo. */
     public function reabrirSeSemEnvio(int $id): void
     {
@@ -179,6 +288,9 @@ class CompetenciaRepository extends Repository
                 'data_envio' => null,
                 'num_recibo' => null,
             ]);
+            return;
         }
+        // Ainda há envios, mas talvez só R-1000 — recalcula
+        $this->sincronizarStatusTransmissao($id);
     }
 }

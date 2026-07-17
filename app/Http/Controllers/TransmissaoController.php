@@ -133,7 +133,13 @@ class TransmissaoController extends Controller
                 return $this->flashRedirect($url, $msg, 'sucesso');
             }
 
-            $this->competencias->marcarTransmitido($compId, $protocolo);
+            // R-1000/R-1070/R-9000 sozinhos não marcam "transmitido";
+            // só quando todos os periódicos com dados forem enviados.
+            $eventosLote = array_values(array_map(
+                static fn ($a) => (string) ($a['evento'] ?? ''),
+                $arquivos
+            ));
+            $this->competencias->sincronizarStatusTransmissao($compId, $eventosLote, $protocolo);
         }
 
         $msg = ($resultado['sucesso'] ? 'Enviado com sucesso' : 'Falha')
@@ -182,6 +188,9 @@ class TransmissaoController extends Controller
                     $this->competencias->reabrirSeSemEnvio($compId);
                 }
             }
+
+            // Recalcula status (R-1000 sozinho não deixa "transmitido")
+            $this->competencias->sincronizarStatusTransmissao($compId, [], $protocolo);
         }
 
         $extra = $qtdRecibos > 0 ? " | {$qtdRecibos} recibo(s) vinculado(s) aos XMLs." : '';
