@@ -13,7 +13,7 @@ class Contribuinte extends Model
     protected $fillable = [
         'usuario_id', 'cnpj', 'razao_social', 'nome_fantasia', 'tipo_contribuinte',
         'classificacao_tributos', 'ie', 'cnae_principal', 'logradouro', 'municipio',
-        'uf', 'cep', 'email', 'telefone',
+        'uf', 'cep', 'email', 'telefone', 'nome_contato', 'cpf_contato',
     ];
 
     public function usuario(): BelongsTo

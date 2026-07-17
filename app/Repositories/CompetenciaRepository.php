@@ -9,7 +9,9 @@ class CompetenciaRepository extends Repository
     public function findWithContribuinte(int $id, int $userId): ?array
     {
         return $this->queryOne("
-            SELECT c.*, co.razao_social, co.cnpj, co.classificacao_tributos
+            SELECT c.*,
+                   co.razao_social, co.cnpj, co.classificacao_tributos,
+                   co.nome_contato, co.cpf_contato, co.email, co.telefone
             FROM competencias c
             JOIN contribuintes co ON co.id = c.contribuinte_id
             WHERE c.id = ? AND co.usuario_id = ?

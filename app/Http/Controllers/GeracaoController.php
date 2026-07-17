@@ -7,6 +7,7 @@ use App\Repositories\CompetenciaRepository;
 use App\Repositories\EventoRepository;
 use App\Services\AssinaturaService;
 use App\Services\GeracaoXmlService;
+use App\Services\ValidacaoService;
 use App\Services\ValidacaoXmlService;
 use Illuminate\Http\Request;
 
@@ -50,6 +51,11 @@ class GeracaoController extends Controller
             $disponiveis[$evt] = $this->eventos->contar($tab, $compId) > 0;
         }
 
+        $cpfContato = preg_replace('/\D/', '', (string) ($comp['cpf_contato'] ?? '')) ?? '';
+        $contatoR1000Ok = trim((string) ($comp['nome_contato'] ?? '')) !== ''
+            && strlen($cpfContato) === 11
+            && ValidacaoService::validarCpf($cpfContato);
+
         return $this->render('pages.geracao.index', [
             'pageTitle'           => 'Gerar XML',
             'competencia'         => $comp,
@@ -58,6 +64,7 @@ class GeracaoController extends Controller
             'arquivosGerados'     => $this->arquivos->listByCompetenciaForUser($compId, $this->userId()),
             'recibosSalvos'       => $this->arquivos->listRecibos($compId, null, $this->userId()),
             'certInfo'            => (new AssinaturaService($this->userId(), (int) $comp['contribuinte_id']))->infoCertificado(),
+            'contatoR1000Ok'      => $contatoR1000Ok,
         ]);
     }
 

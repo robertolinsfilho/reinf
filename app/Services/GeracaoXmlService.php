@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Repositories\ArquivoGeradoRepository;
 use App\Repositories\EventoRepository;
 use App\Repositories\ProcessoRepository;
+use App\Services\ValidacaoService;
 
 class GeracaoXmlService
 {
@@ -152,6 +153,33 @@ class GeracaoXmlService
         $id   = $this->gerarId($cnpj);
         $classif = $comp['classificacao_tributos'] ?? '01';
 
+        $nomeContato = trim(html_entity_decode((string) ($comp['nome_contato'] ?? ''), ENT_QUOTES, 'UTF-8'));
+        $cpfContato  = preg_replace('/\D/', '', (string) ($comp['cpf_contato'] ?? '')) ?? '';
+
+        if ($nomeContato === '' || strlen($cpfContato) !== 11) {
+            throw new \RuntimeException(
+                'Cadastre nome e CPF do contato no contribuinte antes de gerar o R-1000.'
+            );
+        }
+
+        if (!ValidacaoService::validarCpf($cpfContato)) {
+            throw new \RuntimeException('CPF do contato inválido. Atualize o contribuinte.');
+        }
+
+        $email    = trim((string) ($comp['email'] ?? ''));
+        $telefone = preg_replace('/\D/', '', (string) ($comp['telefone'] ?? '')) ?? '';
+
+        $contatoXml = "                    <contato>\n"
+                    . "                        <nmCtt>" . htmlspecialchars($nomeContato, ENT_XML1 | ENT_QUOTES, 'UTF-8') . "</nmCtt>\n"
+                    . "                        <cpfCtt>{$cpfContato}</cpfCtt>\n";
+        if ($telefone !== '') {
+            $contatoXml .= "                        <foneFixo>{$telefone}</foneFixo>\n";
+        }
+        if ($email !== '') {
+            $contatoXml .= "                        <email>" . htmlspecialchars($email, ENT_XML1 | ENT_QUOTES, 'UTF-8') . "</email>\n";
+        }
+        $contatoXml .= "                    </contato>\n";
+
         $body = "        {$this->ideEvento($comp['periodo'])}\n"
               . "        {$this->ideContri($cnpj)}\n"
               . "        <infoContri>\n"
@@ -163,10 +191,7 @@ class GeracaoXmlService
               . "                    <indDesoneracao>0</indDesoneracao>\n"
               . "                    <indAcordoIsenMulta>0</indAcordoIsenMulta>\n"
               . "                    <indSitPJ>0</indSitPJ>\n"
-              . "                    <contato>\n"
-              . "                        <nmCtt>" . htmlspecialchars($comp['razao_social'] ?? '') . "</nmCtt>\n"
-              . "                        <cpfCtt>" . substr($cnpj, 0, 11) . "</cpfCtt>\n"
-              . "                    </contato>\n"
+              . $contatoXml
               . "                </infoCadastro>\n"
               . "            </inclusao>\n"
               . "        </infoContri>";

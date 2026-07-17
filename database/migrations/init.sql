@@ -40,6 +40,8 @@ CREATE TABLE IF NOT EXISTS contribuintes (
     cep VARCHAR(8),
     email VARCHAR(150),
     telefone VARCHAR(15),
+    nome_contato VARCHAR(70) NULL,
+    cpf_contato VARCHAR(11) NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE,

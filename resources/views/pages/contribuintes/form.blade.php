@@ -79,6 +79,38 @@
             </div>
 
             <hr class="my-4">
+            <h6 class="mb-3"><i class="bi bi-person-lines-fill me-1"></i> Contato R-1000</h6>
+            <p class="text-muted small mb-3">
+                Obrigatório para gerar/transmitir o R-1000. Use nome e CPF de pessoa física responsável pelo contato.
+            </p>
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label">Nome do contato *</label>
+                    <input type="text" name="nome_contato" class="form-control"
+                           value="{{ $contribuinte['nome_contato'] ?? '' }}"
+                           maxlength="70" placeholder="Nome completo" required>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">CPF do contato *</label>
+                    <input type="text" name="cpf_contato" id="inputCpfContato" class="form-control font-monospace"
+                           value="{{ $contribuinte['cpf_contato'] ?? '' }}"
+                           placeholder="000.000.000-00" maxlength="14" required>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">E-mail</label>
+                    <input type="email" name="email" class="form-control"
+                           value="{{ $contribuinte['email'] ?? '' }}"
+                           maxlength="60" placeholder="contato@empresa.com.br">
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Telefone</label>
+                    <input type="text" name="telefone" id="inputTelefone" class="form-control font-monospace"
+                           value="{{ $contribuinte['telefone'] ?? '' }}"
+                           placeholder="(00) 00000-0000" maxlength="15">
+                </div>
+            </div>
+
+            <hr class="my-4">
             <div class="d-flex gap-2">
                 <button type="submit" class="btn btn-primary">
                     <i class="bi bi-check-lg me-1"></i> Salvar
@@ -95,6 +127,29 @@
     const input       = document.getElementById('inputInscricao');
     const label       = document.getElementById('labelInscricao');
     const feedback    = document.getElementById('feedbackValidacao');
+    const cpfContato  = document.getElementById('inputCpfContato');
+    const telefone    = document.getElementById('inputTelefone');
+
+    if (cpfContato) {
+        cpfContato.addEventListener('input', function() {
+            this.value = mascarCPF(this.value);
+        });
+        if (cpfContato.value) cpfContato.value = mascarCPF(cpfContato.value);
+    }
+    if (telefone) {
+        telefone.addEventListener('input', function() {
+            let v = this.value.replace(/\D/g, '').slice(0, 11);
+            if (v.length > 10) {
+                this.value = v.replace(/^(\d{2})(\d{5})(\d{0,4}).*/, '($1) $2-$3');
+            } else if (v.length > 6) {
+                this.value = v.replace(/^(\d{2})(\d{4})(\d{0,4}).*/, '($1) $2-$3');
+            } else if (v.length > 2) {
+                this.value = v.replace(/^(\d{2})(\d{0,5}).*/, '($1) $2');
+            } else {
+                this.value = v;
+            }
+        });
+    }
 
     // Configurações por tipo
     // 1=CNPJ (14), 2=CPF (11), 3=CAEPF (14), 4=CNO (12), 5=CGC (14), 6=CEI (12)

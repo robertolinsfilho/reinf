@@ -55,12 +55,28 @@ class ContribuinteController extends Controller
             'nome_fantasia'          => $this->sanitize($request->input('nome_fantasia', '')),
             'tipo_contribuinte'      => $request->input('tipo_contribuinte', '1'),
             'classificacao_tributos' => $this->sanitize($request->input('classificacao_tributos', '')),
+            'nome_contato'           => mb_substr($this->sanitize($request->input('nome_contato', '')), 0, 70),
+            'cpf_contato'            => $this->postCpf($request, 'cpf_contato'),
+            'email'                  => mb_substr($this->sanitize($request->input('email', '')), 0, 60) ?: null,
+            'telefone'               => preg_replace('/\D/', '', (string) $request->input('telefone', '')) ?: null,
         ];
 
         $redirect = $id ? "/contribuintes/editar?id={$id}" : '/contribuintes/novo';
 
         if (empty($dados['cnpj']) || empty($dados['razao_social'])) {
             return $this->flashRedirect($redirect, 'CNPJ e Razão Social são obrigatórios.', 'erro');
+        }
+
+        if ($dados['nome_contato'] === '' || $dados['cpf_contato'] === '') {
+            return $this->flashRedirect($redirect, 'Nome e CPF do contato são obrigatórios para o R-1000.', 'erro');
+        }
+
+        if (!ValidacaoService::validarCpf($dados['cpf_contato'])) {
+            return $this->flashRedirect($redirect, 'CPF do contato inválido.', 'erro');
+        }
+
+        if ($dados['email'] !== null && $dados['email'] !== '' && !filter_var($dados['email'], FILTER_VALIDATE_EMAIL)) {
+            return $this->flashRedirect($redirect, 'E-mail do contato inválido.', 'erro');
         }
 
         if (in_array($dados['tipo_contribuinte'], ['1', '2'])) {
