@@ -239,7 +239,7 @@ class GeracaoXmlService
               . "            </inclusao>\n"
               . "        </infoContri>";
 
-        return $this->envelope('evtInfoContribuinte', 'evtInfoContribuinte', $id, $body);
+        return $this->envelope('evtInfoContri', 'evtInfoContribuinte', $id, $body);
     }
 
     private function montarSoftHouseXml(): string
