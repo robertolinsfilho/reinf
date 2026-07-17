@@ -17,13 +17,16 @@ services:
     depends_on:
       - db
     environment:
+      - DB_CONNECTION=mysql
       - DB_HOST=db
       - DB_PORT=3306
-      - DB_NAME=${DB_NAME:-efd_reinf}
-      - DB_USER=${DB_USER:-reinf_user}
-      - DB_PASS=${DB_PASS:-reinf_pass123}
+      - DB_DATABASE=${DB_DATABASE:-${DB_NAME:-efd_reinf}}
+      - DB_USERNAME=${DB_USERNAME:-${DB_USER:-reinf_user}}
+      - DB_PASSWORD=${DB_PASSWORD:-${DB_PASS:-reinf_pass123}}
       - APP_ENV=${APP_ENV:-local}
+      - APP_DEBUG=${APP_DEBUG:-true}
       - APP_URL=${APP_URL:-http://localhost}
+      - APP_KEY=${APP_KEY:-}
       - APP_SECRET=${APP_SECRET:-}
       - REINF_TP_AMB=${REINF_TP_AMB:-2}
       - ALLOW_SIMULATED_TRANSMISSION=${ALLOW_SIMULATED_TRANSMISSION:-0}
@@ -34,9 +37,9 @@ services:
     restart: unless-stopped
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root_pass123}
-      MYSQL_DATABASE: ${DB_NAME:-efd_reinf}
-      MYSQL_USER: ${DB_USER:-reinf_user}
-      MYSQL_PASSWORD: ${DB_PASS:-reinf_pass123}
+      MYSQL_DATABASE: ${DB_DATABASE:-${DB_NAME:-efd_reinf}}
+      MYSQL_USER: ${DB_USERNAME:-${DB_USER:-reinf_user}}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-${DB_PASS:-reinf_pass123}}
     volumes:
       - db_data:/var/lib/mysql
       - ./database/migrations/init.sql:/docker-entrypoint-initdb.d/init.sql

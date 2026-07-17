@@ -1,48 +1,126 @@
 <?php
 
 return [
-    'app' => [
-        'name'    => $_ENV['APP_NAME'] ?? 'STHEPSON',
-        'url'     => $_ENV['APP_URL'] ?? 'http://localhost',
-        'env'     => $_ENV['APP_ENV'] ?? 'production',
-        'secret'  => $_ENV['APP_SECRET'] ?? '',
-    ],
-    'db' => [
-        'host'    => $_ENV['DB_HOST'] ?? 'db',
-        'port'    => $_ENV['DB_PORT'] ?? '3306',
-        'name'    => $_ENV['DB_NAME'] ?? 'efd_reinf',
-        'user'    => $_ENV['DB_USER'] ?? 'reinf_user',
-        'pass'    => $_ENV['DB_PASS'] ?? '',
-        'charset' => 'utf8mb4',
-    ],
-    'upload' => [
-        'path'     => __DIR__ . '/../storage/uploads/',
-        'max_size' => 50 * 1024 * 1024,
-        'allowed'  => ['xlsx', 'xls', 'xlsm'],
-    ],
-    'security' => [
-        'login_max_attempts' => 5,
-        'login_lockout_sec'  => 900,
-        'max_import_rows'    => 5000,
-        'allow_simulated_transmission' => filter_var(
-            $_ENV['ALLOW_SIMULATED_TRANSMISSION'] ?? '0',
-            FILTER_VALIDATE_BOOLEAN
+
+    /*
+    |--------------------------------------------------------------------------
+    | Application Name
+    |--------------------------------------------------------------------------
+    |
+    | This value is the name of your application, which will be used when the
+    | framework needs to place the application's name in a notification or
+    | other UI elements where an application name needs to be displayed.
+    |
+    */
+
+    'name' => env('APP_NAME', 'Laravel'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Application Environment
+    |--------------------------------------------------------------------------
+    |
+    | This value determines the "environment" your application is currently
+    | running in. This may determine how you prefer to configure various
+    | services the application utilizes. Set this in your ".env" file.
+    |
+    */
+
+    'env' => env('APP_ENV', 'production'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Application Debug Mode
+    |--------------------------------------------------------------------------
+    |
+    | When your application is in debug mode, detailed error messages with
+    | stack traces will be shown on every error that occurs within your
+    | application. If disabled, a simple generic error page is shown.
+    |
+    */
+
+    'debug' => (bool) env('APP_DEBUG', false),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Application URL
+    |--------------------------------------------------------------------------
+    |
+    | This URL is used by the console to properly generate URLs when using
+    | the Artisan command line tool. You should set this to the root of
+    | the application so that it's available within Artisan commands.
+    |
+    */
+
+    'url' => env('APP_URL', 'http://localhost'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Application Timezone
+    |--------------------------------------------------------------------------
+    |
+    | Here you may specify the default timezone for your application, which
+    | will be used by the PHP date and date-time functions. The timezone
+    | is set to "UTC" by default as it is suitable for most use cases.
+    |
+    */
+
+    'timezone' => env('APP_TIMEZONE', 'UTC'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Application Locale Configuration
+    |--------------------------------------------------------------------------
+    |
+    | The application locale determines the default locale that will be used
+    | by Laravel's translation / localization methods. This option can be
+    | set to any locale for which you plan to have translation strings.
+    |
+    */
+
+    'locale' => env('APP_LOCALE', 'en'),
+
+    'fallback_locale' => env('APP_FALLBACK_LOCALE', 'en'),
+
+    'faker_locale' => env('APP_FAKER_LOCALE', 'en_US'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Encryption Key
+    |--------------------------------------------------------------------------
+    |
+    | This key is utilized by Laravel's encryption services and should be set
+    | to a random, 32 character string to ensure that all encrypted values
+    | are secure. You should do this prior to deploying the application.
+    |
+    */
+
+    'cipher' => 'AES-256-CBC',
+
+    'key' => env('APP_KEY'),
+
+    'previous_keys' => [
+        ...array_filter(
+            explode(',', env('APP_PREVIOUS_KEYS', ''))
         ),
     ],
-    'reinf' => [
-        'tp_amb'     => (int) ($_ENV['REINF_TP_AMB'] ?? 2), // 1=Produção, 2=Homologação
-        'ver_proc'   => 'EFD-REINF-WEB-1.0',
-        'proc_emi'   => 1, // 1=Aplicativo do contribuinte
-        'cert_path'  => $_ENV['REINF_CERT_PATH'] ?? __DIR__ . '/../storage/certs/',
-        'cert_pass'  => $_ENV['REINF_CERT_PASS'] ?? '',
-        'ws_envio' => [
-            1 => 'https://reinf.receita.economia.gov.br/recepcao/lotes/',
-            2 => 'https://pre-reinf.receita.economia.gov.br/recepcao/lotes/',
-        ],
-        'ws_consulta' => [
-            1 => 'https://reinf.receita.economia.gov.br/consulta/lotes/',
-            2 => 'https://pre-reinf.receita.economia.gov.br/consulta/lotes/',
-        ],
-        'user_agent' => 'EFD-REINF-WEB/1.0',
+
+    /*
+    |--------------------------------------------------------------------------
+    | Maintenance Mode Driver
+    |--------------------------------------------------------------------------
+    |
+    | These configuration options determine the driver used to determine and
+    | manage Laravel's "maintenance mode" status. The "cache" driver will
+    | allow maintenance mode to be controlled across multiple machines.
+    |
+    | Supported drivers: "file", "cache"
+    |
+    */
+
+    'maintenance' => [
+        'driver' => env('APP_MAINTENANCE_DRIVER', 'file'),
+        'store' => env('APP_MAINTENANCE_STORE', 'database'),
     ],
+
 ];
