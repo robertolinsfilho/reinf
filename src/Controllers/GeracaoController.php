@@ -30,14 +30,14 @@ class GeracaoController extends BaseController
 
         if (!$compId) {
             $this->view('pages/geracao/index', [
-                'pageTitle'          => 'Gerar XML',
-                'competencia'        => null,
-                'competencias'       => $this->competencias->listByUser($this->userId()),
-                'eventosDisponiveis' => [],
-                'arquivosGerados'    => [],
-                'recibosSalvos'      => [],
-                'certInfo'           => (new AssinaturaService($this->userId()))->infoCertificado(),
-                'flash'              => $this->getFlash(),
+                'pageTitle'           => 'Gerar XML',
+                'competencia'         => null,
+                'gruposContribuintes' => $this->competencias->listGroupedByContribuinte($this->userId()),
+                'eventosDisponiveis'  => [],
+                'arquivosGerados'     => [],
+                'recibosSalvos'       => [],
+                'certInfo'            => (new AssinaturaService($this->userId()))->infoCertificado(),
+                'flash'               => $this->getFlash(),
             ]);
             return;
         }
@@ -55,7 +55,7 @@ class GeracaoController extends BaseController
         $this->view('pages/geracao/index', [
             'pageTitle'          => 'Gerar XML',
             'competencia'        => $comp,
-            'competencias'       => [],
+            'gruposContribuintes'=> [],
             'eventosDisponiveis' => $disponiveis,
             'arquivosGerados'    => $this->arquivos->listByCompetenciaForUser($compId, $this->userId()),
             'recibosSalvos'      => $this->arquivos->listRecibos($compId, null, $this->userId()),

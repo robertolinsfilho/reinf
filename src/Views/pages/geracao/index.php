@@ -15,46 +15,14 @@
 </div>
 
 <?php if (!$competencia): ?>
-<div class="card">
-    <div class="card-header"><i class="bi bi-calendar3 me-2"></i>Selecione a competência</div>
-    <div class="card-body">
-        <?php if (empty($competencias)): ?>
-        <div class="text-center text-muted py-4">
-            Nenhuma competência cadastrada.
-            <div class="mt-2"><a href="/competencias/nova" class="btn btn-primary btn-sm">Criar competência</a></div>
-        </div>
-        <?php else: ?>
-        <div class="table-responsive">
-            <table class="table table-hover mb-0">
-                <thead>
-                    <tr>
-                        <th>Contribuinte</th>
-                        <th>Período</th>
-                        <th>Status</th>
-                        <th>R-4020</th>
-                        <th></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php foreach ($competencias as $c): ?>
-                    <tr>
-                        <td><?= htmlspecialchars($c['razao_social']) ?></td>
-                        <td class="font-monospace"><?= htmlspecialchars($c['periodo']) ?></td>
-                        <td><span class="badge bg-secondary"><?= htmlspecialchars($c['status'] ?? '') ?></span></td>
-                        <td><?= (int) ($c['total_r4020'] ?? 0) ?></td>
-                        <td class="text-end">
-                            <a href="/gerar?competencia_id=<?= (int) $c['id'] ?>" class="btn btn-primary btn-sm">
-                                <i class="bi bi-file-earmark-code me-1"></i> Gerar XML
-                            </a>
-                        </td>
-                    </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
-        </div>
-        <?php endif; ?>
-    </div>
-</div>
+<?php
+$grupos = $gruposContribuintes ?? [];
+$basePath = '/gerar';
+$acaoLabel = 'Gerar XML';
+$acaoIcon = 'bi-file-earmark-code';
+$titulo = 'Selecione o contribuinte';
+include BASE_PATH . '/src/Views/pages/partials/selecao_contribuinte_competencia.php';
+?>
 <?php else: ?>
 
 <div class="row g-3">

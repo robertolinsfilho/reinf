@@ -32,7 +32,12 @@ if (\App\Services\CertificadoCrypto::isInsecureSecret($secret)) {
 }
 
 if ($appEnv === 'production') {
-    ini_set('session.cookie_secure', '1');
+    $isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+        || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https')
+        || str_starts_with((string) ($config['app']['url'] ?? ''), 'https://');
+    if ($isHttps) {
+        ini_set('session.cookie_secure', '1');
+    }
 }
 
 session_start();

@@ -41,6 +41,32 @@ class CompetenciaRepository extends Repository
         return $this->query($sql, $params);
     }
 
+    /**
+     * Competências agrupadas por contribuinte (para telas Gerar/Transmissão).
+     *
+     * @return list<array{contribuinte_id:int,razao_social:string,cnpj:string,competencias:list<array>}>
+     */
+    public function listGroupedByContribuinte(int $userId): array
+    {
+        $groups = [];
+        foreach ($this->listByUser($userId) as $c) {
+            $id = (int) $c['contribuinte_id'];
+            if (!isset($groups[$id])) {
+                $groups[$id] = [
+                    'contribuinte_id' => $id,
+                    'razao_social'    => (string) $c['razao_social'],
+                    'cnpj'            => (string) ($c['cnpj'] ?? ''),
+                    'competencias'    => [],
+                ];
+            }
+            $groups[$id]['competencias'][] = $c;
+        }
+
+        uasort($groups, static fn(array $a, array $b): int => strcasecmp($a['razao_social'], $b['razao_social']));
+
+        return array_values($groups);
+    }
+
     public function exists(int $contribuinteId, string $periodo): bool
     {
         return (bool) $this->queryOne(

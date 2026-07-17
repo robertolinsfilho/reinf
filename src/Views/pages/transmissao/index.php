@@ -165,36 +165,14 @@ $transmitidos = array_values(array_filter($arquivos, static function ($a) {
     </div>
 </div>
 <?php else: ?>
-<div class="card mb-3">
-    <div class="card-header"><i class="bi bi-calendar3 me-2"></i>Selecione a competência para transmitir</div>
-    <div class="card-body">
-        <?php if (empty($competencias)): ?>
-        <div class="text-muted">Nenhuma competência cadastrada. <a href="/competencias/nova">Criar agora</a>.</div>
-        <?php else: ?>
-        <div class="table-responsive">
-            <table class="table table-hover mb-0">
-                <thead>
-                    <tr><th>Contribuinte</th><th>Período</th><th>Status</th><th></th></tr>
-                </thead>
-                <tbody>
-                    <?php foreach ($competencias as $c): ?>
-                    <tr>
-                        <td><?= htmlspecialchars($c['razao_social']) ?></td>
-                        <td class="font-monospace"><?= htmlspecialchars($c['periodo']) ?></td>
-                        <td><span class="badge bg-secondary"><?= htmlspecialchars($c['status'] ?? '') ?></span></td>
-                        <td class="text-end">
-                            <a href="/transmissao?competencia_id=<?= (int) $c['id'] ?>" class="btn btn-primary btn-sm">
-                                <i class="bi bi-send me-1"></i> Transmitir
-                            </a>
-                        </td>
-                    </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
-        </div>
-        <?php endif; ?>
-    </div>
-</div>
+<?php
+$grupos = $gruposContribuintes ?? [];
+$basePath = '/transmissao';
+$acaoLabel = 'Transmitir';
+$acaoIcon = 'bi-send';
+$titulo = 'Selecione o contribuinte';
+include BASE_PATH . '/src/Views/pages/partials/selecao_contribuinte_competencia.php';
+?>
 <?php endif; ?>
 
 <!-- Histórico -->

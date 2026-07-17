@@ -47,16 +47,18 @@ class TransmissaoController extends BaseController
         }
 
         $this->view('pages/transmissao/index', [
-            'pageTitle'     => 'Transmissão SEFAZ',
-            'competencia'   => $competencia,
-            'arquivos'      => $competencia
+            'pageTitle'          => 'Transmissão SEFAZ',
+            'competencia'        => $competencia,
+            'arquivos'           => $competencia
                 ? $this->arquivos->listByCompetenciaForUser((int) $competencia['id'], $uid)
                 : [],
-            'historico'     => $this->logs->historicoByUser($uid),
-            'certInfo'      => $certInfo,
-            'competenciaId' => $competencia ? (int) $competencia['id'] : 0,
-            'competencias'  => $this->competencias->listByUser($uid),
-            'flash'         => $this->getFlash(),
+            'historico'          => $this->logs->historicoByUser($uid),
+            'certInfo'           => $certInfo,
+            'competenciaId'      => $competencia ? (int) $competencia['id'] : 0,
+            'gruposContribuintes'=> $competencia
+                ? []
+                : $this->competencias->listGroupedByContribuinte($uid),
+            'flash'              => $this->getFlash(),
         ]);
     }
 

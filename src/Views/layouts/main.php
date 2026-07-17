@@ -6,7 +6,7 @@
     <title><?= $pageTitle ?? 'EFD REINF' ?> – <?= $appName ?></title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.11.3/font/bootstrap-icons.min.css">
-    <link rel="stylesheet" href="/css/app.css?v=3">
+    <link rel="stylesheet" href="/css/app.css?v=4">
 </head>
 <body class="<?= isset($usuario) ? 'has-sidebar' : '' ?>">
 
@@ -88,10 +88,12 @@
     </div>
 </div>
 
+<button type="button" class="sidebar-backdrop" id="sidebar-backdrop" aria-label="Fechar menu" onclick="closeSidebar()"></button>
+
 <!-- Main content -->
 <div class="main-content">
     <div class="topbar">
-        <button class="btn btn-link sidebar-toggle" onclick="toggleSidebar()">
+        <button type="button" class="btn btn-link sidebar-toggle text-dark" onclick="toggleSidebar()" aria-label="Abrir menu">
             <i class="bi bi-list fs-4"></i>
         </button>
         <h5 class="mb-0"><?= $pageTitle ?? '' ?></h5>
@@ -107,10 +109,42 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/js/bootstrap.bundle.min.js"></script>
 <script>
-function toggleSidebar() {
-    document.getElementById('sidebar').classList.toggle('collapsed');
-    document.querySelector('.main-content').classList.toggle('expanded');
+function isMobileNav() {
+    return window.matchMedia('(max-width: 768px)').matches;
 }
+function closeSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    const backdrop = document.getElementById('sidebar-backdrop');
+    if (!sidebar) return;
+    sidebar.classList.remove('open');
+    backdrop?.classList.remove('show');
+    document.body.style.overflow = '';
+}
+function toggleSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    const main = document.querySelector('.main-content');
+    const backdrop = document.getElementById('sidebar-backdrop');
+    if (!sidebar || !main) return;
+
+    if (isMobileNav()) {
+        const opening = !sidebar.classList.contains('open');
+        sidebar.classList.toggle('open', opening);
+        backdrop?.classList.toggle('show', opening);
+        document.body.style.overflow = opening ? 'hidden' : '';
+        return;
+    }
+
+    sidebar.classList.toggle('collapsed');
+    main.classList.toggle('expanded');
+}
+document.getElementById('sidebar')?.querySelectorAll('a.nav-item').forEach((link) => {
+    link.addEventListener('click', () => {
+        if (isMobileNav()) closeSidebar();
+    });
+});
+window.addEventListener('resize', () => {
+    if (!isMobileNav()) closeSidebar();
+});
 document.querySelectorAll('input[data-mask="cnpj"]').forEach(el => {
     el.addEventListener('input', function() {
         let v = this.value.replace(/\D/g,'').slice(0,14);
