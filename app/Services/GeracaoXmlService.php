@@ -57,11 +57,17 @@ class GeracaoXmlService
                 }
                 continue;
             }
+            if ($evento === 'R2010') {
+                $xmls = $this->gerarR2010PorPrestador($competencia);
+                foreach ($xmls as $i => $xml) {
+                    $arquivos[] = $this->salvarXml($evento, $competencia, $xml, $indRetif, $i);
+                }
+                continue;
+            }
 
             $xml = match ($evento) {
                 'R1000' => $this->gerarR1000($competencia),
                 'R1070' => $this->gerarR1070($competencia),
-                'R2010' => $this->gerarR2010($competencia),
                 'R2020' => $this->gerarR2020($competencia),
                 'R2060' => $this->gerarR2060($competencia),
                 'R2099' => $this->gerarR2099($competencia),
@@ -296,30 +302,41 @@ class GeracaoXmlService
 
     // ═══ R-2010 ═══════════════════════════════════════
 
-    private function gerarR2010(array $comp): string
+    /**
+     * R-2010: um XML por prestador (XSD: idePrestServ ocorre 1-1 em ideEstabObra).
+     *
+     * @return list<string>
+     */
+    private function gerarR2010PorPrestador(array $comp): array
     {
-        $cnpj = preg_replace('/\D/', '', $comp['cnpj']);
-        $id   = $this->gerarId($cnpj);
+        $cnpj = preg_replace('/\D/', '', (string) $comp['cnpj']) ?? '';
 
         $registros = $this->eventos->listarParaGeracao('r2010', (int) $comp['id'], 'cnpj_prestador, data_emissao, id');
-
         if (empty($registros)) {
-            throw new \RuntimeException("Nenhum registro R-2010.");
+            throw new \RuntimeException('Nenhum registro R-2010.');
         }
 
-        // Retificação: usa recibo informado ou o último R-2010 consultado nesta competência
-        $reciboEvt = $this->nrRecibo;
-        if ($this->indRetif === 2 && !$reciboEvt) {
-            $reciboEvt = $this->ultimoReciboEvento((int) $comp['id'], 'R2010');
+        $reciboPadrao = $this->nrRecibo;
+        if ($this->indRetif === 2 && !$reciboPadrao) {
+            $reciboPadrao = $this->ultimoReciboEvento((int) $comp['id'], 'R2010');
         }
 
         $porPrest = [];
         foreach ($registros as $r) {
-            $porPrest[preg_replace('/\D/', '', $r['cnpj_prestador'])][] = $r;
+            $cnpjP = preg_replace('/\D/', '', (string) ($r['cnpj_prestador'] ?? '')) ?? '';
+            if ($cnpjP === '') {
+                continue;
+            }
+            $porPrest[$cnpjP][] = $r;
+        }
+        if (empty($porPrest)) {
+            throw new \RuntimeException('Nenhum prestador válido no R-2010.');
         }
 
-        $prestXml = '';
+        $xmls = [];
         foreach ($porPrest as $cnpjP => $nfs) {
+            $id = $this->gerarId($cnpj);
+
             $totBruto = 0.0;
             $totBase  = 0.0;
             $totRet   = 0.0;
@@ -336,62 +353,66 @@ class GeracaoXmlService
                 }
                 $vRet = (float) ($n['valor_retencao'] ?? 0);
                 if ($vRet <= 0 && $vBase > 0) {
-                    // Alíquota padrão: 11% (indCPRB=0) ou 3,5% (indCPRB=1)
                     $aliq = $indCprb === '1' ? 0.035 : 0.11;
                     $vRet = round($vBase * $aliq, 2);
                 }
 
-                $tpServ = preg_replace('/\D/', '', (string) ($n['cod_servico'] ?? ''));
+                $tpServ = preg_replace('/\D/', '', (string) ($n['cod_servico'] ?? '')) ?? '';
                 if ($tpServ === '') {
-                    $tpServ = '100000001'; // Tabela 6 — default limpeza/conservação
+                    $tpServ = '100000001';
                 }
                 $tpServ = str_pad(substr($tpServ, 0, 9), 9, '0', STR_PAD_LEFT);
 
-                $serie   = trim((string) ($n['serie'] ?? ''));
-                $serie   = $serie !== '' ? $serie : '0';
+                $serie    = trim((string) ($n['serie'] ?? ''));
+                $serie    = $serie !== '' ? $serie : '0';
                 $numDocto = trim((string) ($n['num_documento'] ?? ''));
                 $numDocto = $numDocto !== '' ? $numDocto : '1';
-                $dtEm    = $n['data_emissao'] ?: ($comp['periodo'] . '-01');
+                $dtEm     = $n['data_emissao'] ?: ($comp['periodo'] . '-01');
 
                 $totBruto += $vBruto;
                 $totBase  += $vBase;
                 $totRet   += $vRet;
 
-                $nfsXml .= "                    <nfs>"
-                         . '<serie>' . htmlspecialchars($serie) . '</serie>'
-                         . '<numDocto>' . htmlspecialchars($numDocto) . '</numDocto>'
-                         . "<dtEmissaoNF>{$dtEm}</dtEmissaoNF>"
-                         . '<vlrBruto>' . $this->fmtVal($vBruto) . '</vlrBruto>'
-                         . '<infoTpServ>'
-                         . "<tpServico>{$tpServ}</tpServico>"
-                         . '<vlrBaseRet>' . $this->fmtVal($vBase) . '</vlrBaseRet>'
-                         . '<vlrRetencao>' . $this->fmtVal($vRet) . '</vlrRetencao>'
-                         . '</infoTpServ>'
-                         . "</nfs>\n";
+                $nfsXml .= "                    <nfs>\n"
+                         . '                        <serie>' . htmlspecialchars($serie, ENT_XML1 | ENT_QUOTES, 'UTF-8') . "</serie>\n"
+                         . '                        <numDocto>' . htmlspecialchars($numDocto, ENT_XML1 | ENT_QUOTES, 'UTF-8') . "</numDocto>\n"
+                         . "                        <dtEmissaoNF>{$dtEm}</dtEmissaoNF>\n"
+                         . '                        <vlrBruto>' . $this->fmtVal($vBruto) . "</vlrBruto>\n"
+                         . "                        <infoTpServ>\n"
+                         . "                            <tpServico>{$tpServ}</tpServico>\n"
+                         . '                            <vlrBaseRet>' . $this->fmtVal($vBase) . "</vlrBaseRet>\n"
+                         . '                            <vlrRetencao>' . $this->fmtVal($vRet) . "</vlrRetencao>\n"
+                         . "                        </infoTpServ>\n"
+                         . "                    </nfs>\n";
             }
 
-            $prestXml .= "                <idePrestServ>"
-                       . "<cnpjPrestador>{$cnpjP}</cnpjPrestador>"
-                       . '<vlrTotalBruto>' . $this->fmtVal($totBruto) . '</vlrTotalBruto>'
-                       . '<vlrTotalBaseRet>' . $this->fmtVal($totBase) . '</vlrTotalBaseRet>'
-                       . '<vlrTotalRetPrinc>' . $this->fmtVal($totRet) . '</vlrTotalRetPrinc>'
-                       . "<indCPRB>{$indCprb}</indCPRB>\n"
-                       . $nfsXml
-                       . "                </idePrestServ>\n";
+            $reciboEvt = $reciboPadrao;
+            if ($this->indRetif === 2 && count($porPrest) === 1 && $reciboPadrao) {
+                $reciboEvt = $reciboPadrao;
+            }
+
+            $body = "        {$this->ideEvento($comp['periodo'], $this->indRetif, $reciboEvt)}\n"
+                  . "        {$this->ideContri($cnpj)}\n"
+                  . "        <infoServTom>\n"
+                  . "            <ideEstabObra>\n"
+                  . "                <tpInscEstab>1</tpInscEstab>\n"
+                  . "                <nrInscEstab>{$cnpj}</nrInscEstab>\n"
+                  . "                <indObra>0</indObra>\n"
+                  . "                <idePrestServ>\n"
+                  . "                    <cnpjPrestador>{$cnpjP}</cnpjPrestador>\n"
+                  . '                    <vlrTotalBruto>' . $this->fmtVal($totBruto) . "</vlrTotalBruto>\n"
+                  . '                    <vlrTotalBaseRet>' . $this->fmtVal($totBase) . "</vlrTotalBaseRet>\n"
+                  . '                    <vlrTotalRetPrinc>' . $this->fmtVal($totRet) . "</vlrTotalRetPrinc>\n"
+                  . "                    <indCPRB>{$indCprb}</indCPRB>\n"
+                  . $nfsXml
+                  . "                </idePrestServ>\n"
+                  . "            </ideEstabObra>\n"
+                  . "        </infoServTom>";
+
+            $xmls[] = $this->envelope('evtServTom', 'evtTomadorServicos', $id, $body);
         }
 
-        $body = "        {$this->ideEvento($comp['periodo'], $this->indRetif, $reciboEvt)}\n"
-              . "        {$this->ideContri($cnpj)}\n"
-              . "        <infoServTom>\n"
-              . "            <ideEstabObra>"
-              . '<tpInscEstab>1</tpInscEstab>'
-              . "<nrInscEstab>{$cnpj}</nrInscEstab>"
-              . "<indObra>0</indObra>\n"
-              . $prestXml
-              . "            </ideEstabObra>\n"
-              . "        </infoServTom>";
-
-        return $this->envelope('evtServTom', 'evtTomadorServicos', $id, $body);
+        return $xmls;
     }
 
     /**
