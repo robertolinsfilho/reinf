@@ -12,7 +12,7 @@ return [
     'security' => [
         'login_max_attempts' => 5,
         'login_lockout_sec' => 900,
-        'max_import_rows' => 5000,
+        'max_import_rows' => 0, // 0 = sem limite
         'allow_simulated_transmission' => filter_var(
             env('ALLOW_SIMULATED_TRANSMISSION', '0'),
             FILTER_VALIDATE_BOOLEAN

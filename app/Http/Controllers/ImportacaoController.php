@@ -70,7 +70,7 @@ class ImportacaoController extends Controller
 
         $logRepo = new ImportacaoLogRepository($this->db);
         $service = new ImportacaoService($this->db);
-        $maxRows = (int) config('reinf.security.max_import_rows', 5000);
+        $maxRows = (int) config('reinf.security.max_import_rows', 0);
 
         try {
             if ($modo === 'auto') {

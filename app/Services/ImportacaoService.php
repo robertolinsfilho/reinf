@@ -20,7 +20,7 @@ class ImportacaoService
         $this->competencias  = new CompetenciaRepository($db);
     }
 
-    public function processar(string $arquivo, string $evento, int $competenciaId, int $maxRows = 5000): array
+    public function processar(string $arquivo, string $evento, int $competenciaId, int $maxRows = 0): array
     {
         if ($evento === 'R2010') {
             [$rows, $layout] = $this->carregarLinhasR2010($arquivo);
@@ -35,7 +35,7 @@ class ImportacaoService
             $layout = 'simples';
         }
 
-        if (count($rows) > $maxRows) {
+        if ($maxRows > 0 && count($rows) > $maxRows) {
             throw new \RuntimeException("Planilha excede o limite de {$maxRows} linhas por importação.");
         }
 
@@ -83,7 +83,7 @@ class ImportacaoService
         string $evento,
         int $userId,
         ?int $contribuinteId = null,
-        int $maxRows = 5000
+        int $maxRows = 0
     ): array {
         return match ($evento) {
             'R2010' => $this->processarR2010PorPeriodo($arquivo, $userId, $contribuinteId, $maxRows),
@@ -103,7 +103,7 @@ class ImportacaoService
         string $arquivo,
         int $userId,
         ?int $contribuinteId = null,
-        int $maxRows = 5000
+        int $maxRows = 0
     ): array {
         $fallback = null;
         if ($contribuinteId) {
@@ -114,7 +114,7 @@ class ImportacaoService
         }
 
         [$rows, $layout] = $this->carregarLinhasR2010($arquivo);
-        if (count($rows) > $maxRows) {
+        if ($maxRows > 0 && count($rows) > $maxRows) {
             throw new \RuntimeException("Planilha excede o limite de {$maxRows} linhas por importação.");
         }
 
@@ -202,7 +202,7 @@ class ImportacaoService
         string $arquivo,
         int $userId,
         ?int $contribuinteId = null,
-        int $maxRows = 5000
+        int $maxRows = 0
     ): array {
         $fallback = null;
         if ($contribuinteId) {
@@ -213,7 +213,7 @@ class ImportacaoService
         }
 
         [$rows] = $this->carregarLinhasR2055($arquivo);
-        if (count($rows) > $maxRows) {
+        if ($maxRows > 0 && count($rows) > $maxRows) {
             throw new \RuntimeException("Planilha excede o limite de {$maxRows} linhas por importação.");
         }
 
@@ -301,14 +301,14 @@ class ImportacaoService
         string $arquivo,
         int $userId,
         ?int $contribuinteFallbackId = null,
-        int $maxRows = 5000
+        int $maxRows = 0
     ): array {
         $spreadsheet = IOFactory::load($arquivo);
         $sheet       = $spreadsheet->getActiveSheet();
         $rows        = $sheet->toArray(null, true, true, true);
         array_shift($rows);
 
-        if (count($rows) > $maxRows) {
+        if ($maxRows > 0 && count($rows) > $maxRows) {
             throw new \RuntimeException("Planilha excede o limite de {$maxRows} linhas por importação.");
         }
 
