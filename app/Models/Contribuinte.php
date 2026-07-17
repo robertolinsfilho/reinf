@@ -14,6 +14,7 @@ class Contribuinte extends Model
         'usuario_id', 'cnpj', 'razao_social', 'nome_fantasia', 'tipo_contribuinte',
         'classificacao_tributos', 'ie', 'cnae_principal', 'logradouro', 'municipio',
         'uf', 'cep', 'email', 'telefone', 'nome_contato', 'cpf_contato',
+        'ind_escrituracao', 'ind_desoneracao', 'ind_acordo_isen_multa', 'ind_sit_pj',
     ];
 
     public function usuario(): BelongsTo

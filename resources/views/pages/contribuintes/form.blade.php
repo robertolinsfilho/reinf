@@ -17,12 +17,13 @@
             <input type="hidden" name="id" value="{{ $contribuinte['id'] }}">
             @endif
 
+            <h6 class="mb-3"><i class="bi bi-building me-1"></i> Dados do contribuinte</h6>
             <div class="row g-3">
                 <div class="col-md-4">
                     <label class="form-label">Tipo de Inscrição *</label>
                     <select name="tipo_contribuinte" id="tipoContrib" class="form-select">
                         @php
-                        $tipos = ['1'=>'CNPJ','2'=>'CPF','3'=>'CAEPF','4'=>'CNO','5'=>'CGC','6'=>'CEI'];
+                        $tipos = ['1'=>'CNPJ','2'=>'CPF'];
                         @endphp
                         @foreach($tipos as $v => $l)
                         <option value="{{ $v }}" {{ ($contribuinte['tipo_contribuinte'] ?? '1') == $v ? 'selected' : '' }}>
@@ -41,27 +42,19 @@
                 </div>
 
                 <div class="col-md-4">
-                    <label class="form-label">Classificação Tributária</label>
-                    <select name="classificacao_tributos" class="form-select">
+                    <label class="form-label">Classificação Tributária (Tabela 08) *</label>
+                    <select name="classificacao_tributos" class="form-select" required>
                         @php
-                        $classifs = [
-                            '01'=>'01 – Lucro Real',
-                            '02'=>'02 – Lucro Presumido',
-                            '03'=>'03 – Lucro Arbitrado',
-                            '04'=>'04 – Simples Nacional',
-                            '05'=>'05 – MEI',
-                            '06'=>'06 – Imune / Isenta',
-                            '07'=>'07 – Órgão Público',
-                            '08'=>'08 – Produtor Rural PF',
-                            '09'=>'09 – Condomínio',
-                        ];
+                        $classifs = config('reinf.class_trib', []);
+                        $classAtual = $contribuinte['classificacao_tributos'] ?? '99';
                         @endphp
                         @foreach($classifs as $v => $l)
-                        <option value="{{ $v }}" {{ ($contribuinte['classificacao_tributos'] ?? '01') == $v ? 'selected' : '' }}>
+                        <option value="{{ $v }}" {{ $classAtual == $v ? 'selected' : '' }}>
                             {{ $l }}
                         </option>
                         @endforeach
                     </select>
+                    <div class="form-text">Maioria das empresas PJ usa <strong>99</strong>.</div>
                 </div>
 
                 <div class="col-md-8">
@@ -79,9 +72,52 @@
             </div>
 
             <hr class="my-4">
+            <h6 class="mb-3"><i class="bi bi-sliders me-1"></i> Indicadores R-1000</h6>
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label">Obrigatoriedade ECD *</label>
+                    <select name="ind_escrituracao" class="form-select">
+                        <option value="0" {{ (int)($contribuinte['ind_escrituracao'] ?? 0) === 0 ? 'selected' : '' }}>0 – Não obrigada à ECD</option>
+                        <option value="1" {{ (int)($contribuinte['ind_escrituracao'] ?? 0) === 1 ? 'selected' : '' }}>1 – Obrigada à ECD</option>
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Desoneração da folha *</label>
+                    <select name="ind_desoneracao" class="form-select">
+                        <option value="0" {{ (int)($contribuinte['ind_desoneracao'] ?? 0) === 0 ? 'selected' : '' }}>0 – Não aplicável</option>
+                        <option value="1" {{ (int)($contribuinte['ind_desoneracao'] ?? 0) === 1 ? 'selected' : '' }}>1 – Lei 12.546/2011 (só classTrib 02, 03 ou 99)</option>
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Acordo isenção de multa *</label>
+                    <select name="ind_acordo_isen_multa" class="form-select">
+                        <option value="0" {{ (int)($contribuinte['ind_acordo_isen_multa'] ?? 0) === 0 ? 'selected' : '' }}>0 – Sem acordo</option>
+                        <option value="1" {{ (int)($contribuinte['ind_acordo_isen_multa'] ?? 0) === 1 ? 'selected' : '' }}>1 – Com acordo (só classTrib 60)</option>
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Situação da PJ *</label>
+                    <select name="ind_sit_pj" class="form-select">
+                        @php
+                        $sits = [
+                            0 => '0 – Situação normal',
+                            1 => '1 – Extinção',
+                            2 => '2 – Fusão',
+                            3 => '3 – Cisão',
+                            4 => '4 – Incorporação',
+                        ];
+                        @endphp
+                        @foreach($sits as $v => $l)
+                        <option value="{{ $v }}" {{ (int)($contribuinte['ind_sit_pj'] ?? 0) === $v ? 'selected' : '' }}>{{ $l }}</option>
+                        @endforeach
+                    </select>
+                </div>
+            </div>
+
+            <hr class="my-4">
             <h6 class="mb-3"><i class="bi bi-person-lines-fill me-1"></i> Contato R-1000</h6>
             <p class="text-muted small mb-3">
-                Obrigatório para gerar/transmitir o R-1000. Use nome e CPF de pessoa física responsável pelo contato.
+                Pessoa física responsável pelo contato com a RFB. Obrigatório para gerar e transmitir o R-1000.
             </p>
             <div class="row g-3">
                 <div class="col-md-6">
@@ -97,16 +133,17 @@
                            placeholder="000.000.000-00" maxlength="14" required>
                 </div>
                 <div class="col-md-6">
+                    <label class="form-label">Telefone (com DDD) *</label>
+                    <input type="text" name="telefone" id="inputTelefone" class="form-control font-monospace"
+                           value="{{ $contribuinte['telefone'] ?? '' }}"
+                           placeholder="(00) 00000-0000" maxlength="15" required>
+                    <div class="form-text">Mínimo 10 dígitos (DDD + número).</div>
+                </div>
+                <div class="col-md-6">
                     <label class="form-label">E-mail</label>
                     <input type="email" name="email" class="form-control"
                            value="{{ $contribuinte['email'] ?? '' }}"
                            maxlength="60" placeholder="contato@empresa.com.br">
-                </div>
-                <div class="col-md-6">
-                    <label class="form-label">Telefone</label>
-                    <input type="text" name="telefone" id="inputTelefone" class="form-control font-monospace"
-                           value="{{ $contribuinte['telefone'] ?? '' }}"
-                           placeholder="(00) 00000-0000" maxlength="15">
                 </div>
             </div>
 
@@ -151,18 +188,11 @@
         });
     }
 
-    // Configurações por tipo
-    // 1=CNPJ (14), 2=CPF (11), 3=CAEPF (14), 4=CNO (12), 5=CGC (14), 6=CEI (12)
     const config = {
         '1': { nome: 'CNPJ',  maxLen: 14, placeholder: '00.000.000/0001-00', mascara: mascarCNPJ,  valida: validaCNPJ  },
         '2': { nome: 'CPF',   maxLen: 11, placeholder: '000.000.000-00',     mascara: mascarCPF,   valida: validaCPF   },
-        '3': { nome: 'CAEPF', maxLen: 14, placeholder: '000.000.000/000-00', mascara: mascarCAEPF, valida: validaLength(14) },
-        '4': { nome: 'CNO',   maxLen: 12, placeholder: '00.000.00000/00',    mascara: mascarCNO,   valida: validaLength(12) },
-        '5': { nome: 'CGC',   maxLen: 14, placeholder: '00.000.000/0001-00', mascara: mascarCNPJ,  valida: validaLength(14) },
-        '6': { nome: 'CEI',   maxLen: 12, placeholder: '00.000.00000/00',    mascara: mascarCNO,   valida: validaLength(12) },
     };
 
-    // ─── Máscaras ────────────────────────────────────────────
     function mascarCNPJ(v) {
         v = v.replace(/\D/g,'').slice(0,14);
         v = v.replace(/^(\d{2})(\d)/,'$1.$2');
@@ -178,36 +208,17 @@
         v = v.replace(/(\d{3})\.(\d{3})\.(\d{3})(\d)/,'$1.$2.$3-$4');
         return v;
     }
-    function mascarCAEPF(v) {
-        v = v.replace(/\D/g,'').slice(0,14);
-        v = v.replace(/^(\d{3})(\d)/,'$1.$2');
-        v = v.replace(/^(\d{3})\.(\d{3})(\d)/,'$1.$2.$3');
-        v = v.replace(/\.(\d{3})(\d)/,'.$1/$2');
-        v = v.replace(/(\d{3})(\d{1,2})$/,'$1-$2');
-        return v;
-    }
-    function mascarCNO(v) {
-        v = v.replace(/\D/g,'').slice(0,12);
-        v = v.replace(/^(\d{2})(\d)/,'$1.$2');
-        v = v.replace(/^(\d{2})\.(\d{3})(\d)/,'$1.$2.$3');
-        v = v.replace(/(\d{5})(\d)/,'$1/$2');
-        return v;
-    }
 
-    // ─── Validações ──────────────────────────────────────────
     function validaCNPJ(cnpj) {
         cnpj = cnpj.replace(/\D/g,'');
         if (cnpj.length !== 14) return false;
         if (/^(\d)\1{13}$/.test(cnpj)) return false;
-
         let pesos1 = [5,4,3,2,9,8,7,6,5,4,3,2];
         let pesos2 = [6,5,4,3,2,9,8,7,6,5,4,3,2];
-
         let soma = 0;
         for (let i = 0; i < 12; i++) soma += parseInt(cnpj[i]) * pesos1[i];
         let d1 = (soma % 11 < 2) ? 0 : 11 - (soma % 11);
         if (parseInt(cnpj[12]) !== d1) return false;
-
         soma = 0;
         for (let i = 0; i < 13; i++) soma += parseInt(cnpj[i]) * pesos2[i];
         let d2 = (soma % 11 < 2) ? 0 : 11 - (soma % 11);
@@ -217,77 +228,43 @@
         cpf = cpf.replace(/\D/g,'');
         if (cpf.length !== 11) return false;
         if (/^(\d)\1{10}$/.test(cpf)) return false;
-
         let soma = 0;
         for (let i = 0; i < 9; i++) soma += parseInt(cpf[i]) * (10 - i);
         let d1 = (soma % 11 < 2) ? 0 : 11 - (soma % 11);
         if (parseInt(cpf[9]) !== d1) return false;
-
         soma = 0;
         for (let i = 0; i < 10; i++) soma += parseInt(cpf[i]) * (11 - i);
         let d2 = (soma % 11 < 2) ? 0 : 11 - (soma % 11);
         return parseInt(cpf[10]) === d2;
     }
-    function validaLength(len) {
-        return v => v.replace(/\D/g,'').length === len;
-    }
 
-    // ─── Atualizar UI ────────────────────────────────────────
     function atualizar() {
-        const cfg = config[tipoContrib.value];
-        label.textContent   = cfg.nome + ' *';
-        input.placeholder   = cfg.placeholder;
-        input.maxLength     = cfg.placeholder.length;
-
-        // Reaplica máscara sobre o valor atual
+        const cfg = config[tipoContrib.value] || config['1'];
+        label.textContent = cfg.nome + ' *';
+        input.placeholder = cfg.placeholder;
         input.value = cfg.mascara(input.value);
         validar();
     }
 
     function validar() {
-        const cfg   = config[tipoContrib.value];
-        const raw   = input.value.replace(/\D/g,'');
-        input.classList.remove('is-valid','is-invalid');
-        feedback.className   = 'form-text';
-        feedback.textContent = '';
-
-        if (raw.length === 0) return;
-
-        if (raw.length < cfg.maxLen) {
-            input.classList.add('is-invalid');
-            feedback.className = 'form-text text-danger';
-            feedback.textContent = `${cfg.nome} incompleto (${raw.length}/${cfg.maxLen} dígitos)`;
-        } else if (cfg.valida(input.value)) {
-            input.classList.add('is-valid');
+        const cfg = config[tipoContrib.value] || config['1'];
+        const digits = input.value.replace(/\D/g,'');
+        if (!digits) { feedback.textContent = ''; feedback.className = 'form-text'; return; }
+        if (cfg.valida(digits)) {
+            feedback.textContent = cfg.nome + ' válido';
             feedback.className = 'form-text text-success';
-            feedback.innerHTML = `<i class="bi bi-check-circle-fill"></i> ${cfg.nome} válido`;
         } else {
-            input.classList.add('is-invalid');
+            feedback.textContent = cfg.nome + ' inválido';
             feedback.className = 'form-text text-danger';
-            feedback.innerHTML = `<i class="bi bi-x-circle-fill"></i> ${cfg.nome} inválido (dígito verificador não confere)`;
         }
     }
 
     tipoContrib.addEventListener('change', atualizar);
-
     input.addEventListener('input', function() {
-        const cfg = config[tipoContrib.value];
+        const cfg = config[tipoContrib.value] || config['1'];
         this.value = cfg.mascara(this.value);
         validar();
     });
-
-    // Impedir submit se inválido (só bloqueia CPF e CNPJ que têm DV)
-    document.getElementById('formContribuinte').addEventListener('submit', function(e) {
-        const cfg   = config[tipoContrib.value];
-        const raw   = input.value.replace(/\D/g,'');
-        if (raw.length !== cfg.maxLen || !cfg.valida(input.value)) {
-            e.preventDefault();
-            input.focus();
-            alert(`${cfg.nome} inválido. Verifique o número informado.`);
-        }
-    });
-
-    // Inicializar
     atualizar();
 })();
 </script>

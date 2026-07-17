@@ -52,9 +52,12 @@ class GeracaoController extends Controller
         }
 
         $cpfContato = preg_replace('/\D/', '', (string) ($comp['cpf_contato'] ?? '')) ?? '';
+        $telefone   = preg_replace('/\D/', '', (string) ($comp['telefone'] ?? '')) ?? '';
         $contatoR1000Ok = trim((string) ($comp['nome_contato'] ?? '')) !== ''
             && strlen($cpfContato) === 11
-            && ValidacaoService::validarCpf($cpfContato);
+            && ValidacaoService::validarCpf($cpfContato)
+            && strlen($telefone) >= 10
+            && array_key_exists((string) ($comp['classificacao_tributos'] ?? ''), config('reinf.class_trib', []));
 
         return $this->render('pages.geracao.index', [
             'pageTitle'           => 'Gerar XML',

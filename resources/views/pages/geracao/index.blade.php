@@ -28,8 +28,8 @@
 <div class="alert alert-warning d-flex align-items-start gap-2">
     <i class="bi bi-exclamation-triangle-fill mt-1"></i>
     <div>
-        <strong>Contato do R-1000 incompleto.</strong>
-        Cadastre nome e CPF de pessoa física no contribuinte antes de gerar o R-1000.
+        <strong>Cadastro R-1000 incompleto.</strong>
+        Preencha no contribuinte: classificação tributária (Tabela 08), indicadores, nome/CPF do contato e telefone com DDD.
         <a href="/contribuintes/editar?id={{ (int) $competencia['contribuinte_id'] }}" class="alert-link">Editar contribuinte</a>
     </div>
 </div>

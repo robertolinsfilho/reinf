@@ -123,10 +123,21 @@ class GeracaoXmlService
         return $xml;
     }
 
-    private function ideContri(string $cnpj): string
+    /** ideEvento dos eventos de tabela (R-1000 / R-1070): só tpAmb, procEmi, verProc. */
+    private function ideEventoTabela(): string
     {
-        $tp = strlen(preg_replace('/\D/', '', $cnpj)) <= 11 ? '2' : '1';
-        return "<ideContri>\n            <tpInsc>{$tp}</tpInsc>\n            <nrInsc>" . preg_replace('/\D/', '', $cnpj) . "</nrInsc>\n        </ideContri>";
+        return "<ideEvento>\n"
+             . "            <tpAmb>{$this->tpAmb}</tpAmb>\n"
+             . "            <procEmi>{$this->procEmi}</procEmi>\n"
+             . "            <verProc>{$this->verProc}</verProc>\n"
+             . "        </ideEvento>";
+    }
+
+    private function ideContri(string $cnpj, ?string $tpInsc = null): string
+    {
+        $nr = preg_replace('/\D/', '', $cnpj) ?? '';
+        $tp = $tpInsc ?? (strlen($nr) <= 11 ? '2' : '1');
+        return "<ideContri>\n            <tpInsc>{$tp}</tpInsc>\n            <nrInsc>{$nr}</nrInsc>\n        </ideContri>";
     }
 
     private function envelope(string $eventoTag, string $namespace, string $id, string $conteudo): string
@@ -149,9 +160,15 @@ class GeracaoXmlService
 
     private function gerarR1000(array $comp): string
     {
-        $cnpj = preg_replace('/\D/', '', $comp['cnpj']);
+        $cnpj = preg_replace('/\D/', '', (string) ($comp['cnpj'] ?? '')) ?? '';
+        $tpInsc = (string) ($comp['tipo_contribuinte'] ?? (strlen($cnpj) <= 11 ? '2' : '1'));
         $id   = $this->gerarId($cnpj);
-        $classif = $comp['classificacao_tributos'] ?? '01';
+
+        $classif = str_pad(preg_replace('/\D/', '', (string) ($comp['classificacao_tributos'] ?? '99')) ?? '99', 2, '0', STR_PAD_LEFT);
+        $tabela08 = array_keys(config('reinf.class_trib', []));
+        if (!in_array($classif, $tabela08, true)) {
+            throw new \RuntimeException('Classificação tributária inválida (Tabela 08). Atualize o contribuinte.');
+        }
 
         $nomeContato = trim(html_entity_decode((string) ($comp['nome_contato'] ?? ''), ENT_QUOTES, 'UTF-8'));
         $cpfContato  = preg_replace('/\D/', '', (string) ($comp['cpf_contato'] ?? '')) ?? '';
@@ -168,35 +185,81 @@ class GeracaoXmlService
 
         $email    = trim((string) ($comp['email'] ?? ''));
         $telefone = preg_replace('/\D/', '', (string) ($comp['telefone'] ?? '')) ?? '';
+        if (strlen($telefone) < 10) {
+            throw new \RuntimeException('Cadastre telefone com DDD (mín. 10 dígitos) no contribuinte.');
+        }
+
+        $indEscrit = (int) ($comp['ind_escrituracao'] ?? 0);
+        $indDeson  = (int) ($comp['ind_desoneracao'] ?? 0);
+        $indAcordo = (int) ($comp['ind_acordo_isen_multa'] ?? 0);
+        $indSitPj  = (int) ($comp['ind_sit_pj'] ?? 0);
+
+        if ($indDeson === 1 && !in_array($classif, ['02', '03', '99'], true)) {
+            throw new \RuntimeException('Desoneração da folha só é permitida com classTrib 02, 03 ou 99.');
+        }
+        if ($indAcordo === 1 && $classif !== '60') {
+            throw new \RuntimeException('Acordo de isenção de multa só é permitido com classTrib 60.');
+        }
 
         $contatoXml = "                    <contato>\n"
                     . "                        <nmCtt>" . htmlspecialchars($nomeContato, ENT_XML1 | ENT_QUOTES, 'UTF-8') . "</nmCtt>\n"
-                    . "                        <cpfCtt>{$cpfContato}</cpfCtt>\n";
-        if ($telefone !== '') {
-            $contatoXml .= "                        <foneFixo>{$telefone}</foneFixo>\n";
-        }
+                    . "                        <cpfCtt>{$cpfContato}</cpfCtt>\n"
+                    . "                        <foneFixo>{$telefone}</foneFixo>\n";
         if ($email !== '') {
             $contatoXml .= "                        <email>" . htmlspecialchars($email, ENT_XML1 | ENT_QUOTES, 'UTF-8') . "</email>\n";
         }
         $contatoXml .= "                    </contato>\n";
 
-        $body = "        {$this->ideEvento($comp['periodo'])}\n"
-              . "        {$this->ideContri($cnpj)}\n"
+        $softXml = $this->montarSoftHouseXml();
+
+        $infoCadastro = "                <infoCadastro>\n"
+                      . "                    <classTrib>{$classif}</classTrib>\n"
+                      . "                    <indEscrituracao>{$indEscrit}</indEscrituracao>\n"
+                      . "                    <indDesoneracao>{$indDeson}</indDesoneracao>\n"
+                      . "                    <indAcordoIsenMulta>{$indAcordo}</indAcordoIsenMulta>\n";
+        if ($tpInsc === '1') {
+            $infoCadastro .= "                    <indSitPJ>{$indSitPj}</indSitPJ>\n";
+        }
+        $infoCadastro .= $contatoXml . $softXml . "                </infoCadastro>\n";
+
+        $iniValid = $comp['periodo']; // AAAA-MM da competência = início de validade do R-1000
+
+        $body = "        {$this->ideEventoTabela()}\n"
+              . "        {$this->ideContri($cnpj, $tpInsc)}\n"
               . "        <infoContri>\n"
               . "            <inclusao>\n"
-              . "                <idePeriodo><iniValid>{$comp['periodo']}</iniValid></idePeriodo>\n"
-              . "                <infoCadastro>\n"
-              . "                    <classTrib>{$classif}</classTrib>\n"
-              . "                    <indEscrituracao>0</indEscrituracao>\n"
-              . "                    <indDesoneracao>0</indDesoneracao>\n"
-              . "                    <indAcordoIsenMulta>0</indAcordoIsenMulta>\n"
-              . "                    <indSitPJ>0</indSitPJ>\n"
-              . $contatoXml
-              . "                </infoCadastro>\n"
+              . "                <idePeriodo><iniValid>{$iniValid}</iniValid></idePeriodo>\n"
+              . $infoCadastro
               . "            </inclusao>\n"
               . "        </infoContri>";
 
         return $this->envelope('evtInfoContribuinte', 'evtInfoContribuinte', $id, $body);
+    }
+
+    private function montarSoftHouseXml(): string
+    {
+        $sh = (array) config('reinf.softhouse', []);
+        $cnpj = preg_replace('/\D/', '', (string) ($sh['cnpj'] ?? '')) ?? '';
+        $razao = trim((string) ($sh['razao'] ?? ''));
+        $contato = trim((string) ($sh['contato'] ?? ''));
+        if ($cnpj === '' || strlen($cnpj) !== 14 || $razao === '' || $contato === '') {
+            return '';
+        }
+
+        $xml = "                    <softHouse>\n"
+             . "                        <cnpjSoftHouse>{$cnpj}</cnpjSoftHouse>\n"
+             . "                        <nmRazao>" . htmlspecialchars($razao, ENT_XML1 | ENT_QUOTES, 'UTF-8') . "</nmRazao>\n"
+             . "                        <nmCont>" . htmlspecialchars($contato, ENT_XML1 | ENT_QUOTES, 'UTF-8') . "</nmCont>\n";
+        $tel = preg_replace('/\D/', '', (string) ($sh['telefone'] ?? '')) ?? '';
+        if (strlen($tel) >= 10) {
+            $xml .= "                        <telefone>{$tel}</telefone>\n";
+        }
+        $email = trim((string) ($sh['email'] ?? ''));
+        if ($email !== '') {
+            $xml .= "                        <email>" . htmlspecialchars($email, ENT_XML1 | ENT_QUOTES, 'UTF-8') . "</email>\n";
+        }
+        $xml .= "                    </softHouse>\n";
+        return $xml;
     }
 
     // ═══ R-1070 ═══════════════════════════════════════
@@ -224,7 +287,7 @@ class GeracaoXmlService
                           . "            </inclusao>\n";
         }
 
-        $body = "        {$this->ideEvento($comp['periodo'], $this->indRetif, $this->nrRecibo)}\n"
+        $body = "        {$this->ideEventoTabela()}\n"
               . "        {$this->ideContri($cnpj)}\n"
               . "        <infoProcesso>\n" . $processosXml . "        </infoProcesso>";
 
