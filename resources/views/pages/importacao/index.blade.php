@@ -24,7 +24,7 @@
                 </div>
                 @else
 
-                <form action="/importar/processar" method="POST" enctype="multipart/form-data" id="form-importar">
+                <form action="/importar/iniciar" method="POST" enctype="multipart/form-data" id="form-importar">
                     @csrf
 
                     <div class="mb-3">
@@ -111,7 +111,21 @@
                       <div class="form-text">Formatos aceitos: .xlsx, .xlsm, .xls (máximo 50MB)</div>
                     </div>
 
-                    <button type="submit" class="btn btn-primary w-100">
+                    <div id="import-progress" class="d-none mb-3">
+                        <div class="d-flex justify-content-between small mb-1">
+                            <span id="import-progress-label">Preparando…</span>
+                            <span id="import-progress-pct">0%</span>
+                        </div>
+                        <div class="progress" style="height: 22px;">
+                            <div id="import-progress-bar" class="progress-bar progress-bar-striped progress-bar-animated"
+                                 role="progressbar" style="width: 0%">0%</div>
+                        </div>
+                        <div class="form-text" id="import-progress-detail"></div>
+                    </div>
+
+                    <div id="import-result" class="alert d-none mb-3"></div>
+
+                    <button type="submit" id="btn-importar" class="btn btn-primary w-100">
                         <i class="bi bi-upload me-1"></i> Importar Planilha
                     </button>
                 </form>
@@ -143,6 +157,76 @@
                     document.getElementById('hint-r2055').classList.toggle('d-none', !(isAuto && evtAtual === 'R2055'));
                     document.getElementById('hint-r4020').classList.toggle('d-none', !(isAuto && evtAtual === 'R4020'));
                 }
+
+                (function () {
+                    const form = document.getElementById('form-importar');
+                    if (!form) return;
+                    const btn = document.getElementById('btn-importar');
+                    const box = document.getElementById('import-progress');
+                    const bar = document.getElementById('import-progress-bar');
+                    const pctEl = document.getElementById('import-progress-pct');
+                    const label = document.getElementById('import-progress-label');
+                    const detail = document.getElementById('import-progress-detail');
+                    const result = document.getElementById('import-result');
+                    const csrf = form.querySelector('input[name="_token"]').value;
+
+                    function setProgress(pct, text, extra) {
+                        const p = Math.max(0, Math.min(100, pct));
+                        bar.style.width = p + '%';
+                        bar.textContent = p.toFixed(0) + '%';
+                        pctEl.textContent = p.toFixed(1) + '%';
+                        if (text) label.textContent = text;
+                        if (extra !== undefined) detail.textContent = extra;
+                    }
+
+                    function showResult(ok, msg) {
+                        result.classList.remove('d-none', 'alert-success', 'alert-danger');
+                        result.classList.add(ok ? 'alert-success' : 'alert-danger');
+                        result.textContent = msg;
+                    }
+
+                    async function processChunks(token) {
+                        while (true) {
+                            const body = new FormData();
+                            body.append('_token', csrf);
+                            body.append('token', token);
+                            const res = await fetch('/importar/chunk', { method: 'POST', body, credentials: 'same-origin' });
+                            const data = await res.json();
+                            if (!data.ok) throw new Error(data.erro || 'Falha no processamento');
+                            setProgress(
+                                data.percent || 0,
+                                'Importando…',
+                                (data.processed || 0) + ' / ' + (data.total || 0) + ' linhas · ' + (data.importados || 0) + ' importados'
+                            );
+                            if (data.done) return data;
+                        }
+                    }
+
+                    form.addEventListener('submit', async function (e) {
+                        e.preventDefault();
+                        result.classList.add('d-none');
+                        box.classList.remove('d-none');
+                        btn.disabled = true;
+                        setProgress(2, 'Enviando arquivo…', '');
+
+                        try {
+                            const fd = new FormData(form);
+                            const start = await fetch('/importar/iniciar', { method: 'POST', body: fd, credentials: 'same-origin' });
+                            const started = await start.json();
+                            if (!started.ok) throw new Error(started.erro || 'Falha ao iniciar');
+                            setProgress(5, 'Arquivo recebido — processando…', '0 / ' + started.total + ' linhas');
+                            const final = await processChunks(started.token);
+                            setProgress(100, 'Concluído', '');
+                            bar.classList.remove('progress-bar-animated');
+                            showResult(true, final.message || 'Importação concluída.');
+                            setTimeout(function () { window.location.reload(); }, 1200);
+                        } catch (err) {
+                            showResult(false, err.message || 'Erro na importação');
+                            btn.disabled = false;
+                            bar.classList.remove('progress-bar-animated');
+                        }
+                    });
+                })();
                 </script>
 
                 @endif

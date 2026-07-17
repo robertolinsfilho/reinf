@@ -73,6 +73,8 @@ Route::middleware(['auth', 'force.password'])->group(function () {
     // Importação
     Route::get('/importar', [ImportacaoController::class, 'index']);
     Route::post('/importar/processar', [ImportacaoController::class, 'processar']);
+    Route::post('/importar/iniciar', [ImportacaoController::class, 'iniciar']);
+    Route::post('/importar/chunk', [ImportacaoController::class, 'chunk']);
 
     // Geração XML
     Route::get('/gerar', [GeracaoController::class, 'index']);

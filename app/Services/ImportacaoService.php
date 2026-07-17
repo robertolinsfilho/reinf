@@ -20,6 +20,275 @@ class ImportacaoService
         $this->competencias  = new CompetenciaRepository($db);
     }
 
+    /**
+     * Carrega linhas da planilha para job com progresso.
+     *
+     * @return array{rows: list<array>, layout: string}
+     */
+    public function prepararLinhas(string $arquivo, string $evento, int $maxRows = 0): array
+    {
+        if ($evento === 'R2010') {
+            [$rows, $layout] = $this->carregarLinhasR2010($arquivo);
+        } elseif ($evento === 'R2055') {
+            [$rows] = $this->carregarLinhasR2055($arquivo);
+            $layout = 'oficial';
+        } else {
+            $spreadsheet = IOFactory::load($arquivo);
+            $sheet       = $spreadsheet->getActiveSheet();
+            $rows        = $sheet->toArray(null, true, true, true);
+            array_shift($rows);
+            $layout = 'simples';
+        }
+
+        $rows = array_values($rows);
+        if ($maxRows > 0 && count($rows) > $maxRows) {
+            throw new \RuntimeException("Planilha excede o limite de {$maxRows} linhas por importação.");
+        }
+
+        return ['rows' => $rows, 'layout' => $layout];
+    }
+
+    /**
+     * Processa um lote de linhas (chunk) — usado pela barra de progresso.
+     *
+     * @param list<array> $batch
+     * @param array{
+     *   layout: string,
+     *   modo: string,
+     *   competencia_id: ?int,
+     *   contribuinte_id: ?int,
+     *   cache_comp: array,
+     *   resumo: array
+     * } $ctx
+     * @return array{importados:int,uteis:int,erros:list<string>,cache_comp:array,resumo:array}
+     */
+    public function processarLoteLinhas(string $evento, array $batch, int $userId, array $ctx): array
+    {
+        $layout = (string) ($ctx['layout'] ?? 'simples');
+        $modo   = (string) ($ctx['modo'] ?? 'manual');
+        $compIdFixo = isset($ctx['competencia_id']) ? (int) $ctx['competencia_id'] : 0;
+        $contribId  = isset($ctx['contribuinte_id']) ? (int) $ctx['contribuinte_id'] : 0;
+        $cacheComp  = is_array($ctx['cache_comp'] ?? null) ? $ctx['cache_comp'] : [];
+        $resumo     = is_array($ctx['resumo'] ?? null) ? $ctx['resumo'] : [];
+
+        $fallback = null;
+        if ($contribId > 0) {
+            $fallback = $this->contribuintes->findByUser($contribId, $userId);
+        }
+
+        $importados = 0;
+        $uteis = 0;
+        $erros = [];
+
+        foreach ($batch as $i => $row) {
+            try {
+                $valores = array_filter($row, static fn($v) => $v !== null && $v !== '');
+                if ($valores === []) {
+                    continue;
+                }
+
+                if ($modo === 'manual') {
+                    if ($compIdFixo <= 0) {
+                        throw new \RuntimeException('Competência não informada.');
+                    }
+                    $ok = match ($evento) {
+                        'R2010' => $this->importarR2010($row, $compIdFixo, $layout),
+                        'R2020' => $this->importarR2020($row, $compIdFixo),
+                        'R2055' => $this->importarR2055($row, $compIdFixo),
+                        'R2060' => $this->importarR2060($row, $compIdFixo),
+                        'R4010' => $this->importarR4010($row, $compIdFixo),
+                        'R4020' => $this->importarR4020($row, $compIdFixo),
+                        default => throw new \RuntimeException("Evento {$evento} não suportado."),
+                    };
+                    if ($ok) {
+                        $uteis++;
+                        $importados++;
+                        $chave = 'manual|' . $compIdFixo;
+                        if (!isset($resumo[$chave])) {
+                            $resumo[$chave] = [
+                                'periodo'    => '',
+                                'id'         => $compIdFixo,
+                                'criada'     => false,
+                                'importados' => 0,
+                            ];
+                        }
+                        $resumo[$chave]['importados']++;
+                    }
+                    continue;
+                }
+
+                // Modo automático por período
+                if ($evento === 'R2010') {
+                    $norm = $this->normalizarLinhaR2010($row, $layout);
+                    if ($norm['cnpj_prestador'] === '' || strlen($norm['cnpj_prestador']) < 11) {
+                        continue;
+                    }
+                    $uteis++;
+                    if (!$norm['data_emissao']) {
+                        throw new \RuntimeException('Sem data de emissão.');
+                    }
+                    $periodo = substr($norm['data_emissao'], 0, 7);
+                    $contribuinte = null;
+                    if ($norm['cnpj_empresa'] !== '') {
+                        $contribuinte = $this->contribuintes->findByCnpjAndUser($norm['cnpj_empresa'], $userId);
+                    }
+                    if (!$contribuinte) {
+                        $contribuinte = $fallback;
+                    }
+                    if (!$contribuinte) {
+                        throw new \RuntimeException('Selecione o contribuinte (planilha sem CNPJ da empresa).');
+                    }
+                    $chave = $contribuinte['id'] . '|' . $periodo;
+                    if (!isset($cacheComp[$chave])) {
+                        $res = $this->competencias->findOrCreate((int) $contribuinte['id'], $periodo);
+                        $cacheComp[$chave] = [
+                            'id'     => (int) $res['competencia']['id'],
+                            'criada' => (bool) $res['criada'],
+                        ];
+                    }
+                    if ($this->inserirR2010Normalizado($norm, $cacheComp[$chave]['id'])) {
+                        $importados++;
+                        if (!isset($resumo[$chave])) {
+                            $resumo[$chave] = [
+                                'periodo'    => $periodo,
+                                'id'         => $cacheComp[$chave]['id'],
+                                'criada'     => $cacheComp[$chave]['criada'],
+                                'importados' => 0,
+                            ];
+                        }
+                        $resumo[$chave]['importados']++;
+                    }
+                } elseif ($evento === 'R4020') {
+                    $cnpjBenef = preg_replace('/\D/', '', (string) ($row['B'] ?? '')) ?? '';
+                    if ($cnpjBenef === '' || strlen($cnpjBenef) < 11) {
+                        continue;
+                    }
+                    $uteis++;
+                    $periodo = $this->extrairPeriodoR4020($row);
+                    if (!$periodo) {
+                        throw new \RuntimeException('Sem data fato gerador / período de apuração.');
+                    }
+                    $cnpjContri = preg_replace('/\D/', '', (string) ($row['A'] ?? '')) ?: '';
+                    $contribuinte = null;
+                    if ($cnpjContri !== '') {
+                        $contribuinte = $this->contribuintes->findByCnpjAndUser($cnpjContri, $userId);
+                    }
+                    if (!$contribuinte) {
+                        $contribuinte = $fallback;
+                    }
+                    if (!$contribuinte) {
+                        throw new \RuntimeException('CNPJ contribuinte vazio. Selecione um contribuinte padrão.');
+                    }
+                    $chave = $contribuinte['id'] . '|' . $periodo;
+                    if (!isset($cacheComp[$chave])) {
+                        $res = $this->competencias->findOrCreate((int) $contribuinte['id'], $periodo);
+                        $cacheComp[$chave] = [
+                            'id'     => (int) $res['competencia']['id'],
+                            'criada' => (bool) $res['criada'],
+                        ];
+                    }
+                    if ($this->importarR4020($row, $cacheComp[$chave]['id'])) {
+                        $importados++;
+                        if (!isset($resumo[$chave])) {
+                            $resumo[$chave] = [
+                                'periodo'    => $periodo,
+                                'id'         => $cacheComp[$chave]['id'],
+                                'criada'     => $cacheComp[$chave]['criada'],
+                                'importados' => 0,
+                            ];
+                        }
+                        $resumo[$chave]['importados']++;
+                    }
+                } elseif ($evento === 'R2055') {
+                    // Reusa fluxo completo por linha via inserir existente
+                    $okLinha = $this->processarUmaLinhaR2055Auto($row, $userId, $fallback, $cacheComp, $resumo);
+                    if ($okLinha['util']) {
+                        $uteis++;
+                    }
+                    if ($okLinha['ok']) {
+                        $importados++;
+                    }
+                    if ($okLinha['erro']) {
+                        throw new \RuntimeException($okLinha['erro']);
+                    }
+                } else {
+                    throw new \RuntimeException("Modo automático não disponível para {$evento}.");
+                }
+            } catch (\Throwable $e) {
+                $erros[] = 'Linha: ' . $e->getMessage();
+            }
+        }
+
+        return [
+            'importados' => $importados,
+            'uteis'      => $uteis,
+            'erros'      => $erros,
+            'cache_comp' => $cacheComp,
+            'resumo'     => $resumo,
+        ];
+    }
+
+    /**
+     * @param array<string,mixed>|null $fallback
+     * @param array<string,mixed> $cacheComp
+     * @param array<string,mixed> $resumo
+     * @return array{ok:bool,util:bool,erro:?string}
+     */
+    private function processarUmaLinhaR2055Auto(array $row, int $userId, ?array $fallback, array &$cacheComp, array &$resumo): array
+    {
+        // Delega ao fluxo já existente: processa um "mini" lote via lógica duplicada mínima
+        // Usando importarR2055 exige competencia_id — resolve período como em processarR2055PorPeriodo
+        $cnpjEmpresa = preg_replace('/\D/', '', (string) ($row['A'] ?? '')) ?? '';
+        $nrProd = preg_replace('/\D/', '', (string) ($row['C'] ?? '')) ?? '';
+        if ($nrProd === '') {
+            return ['ok' => false, 'util' => false, 'erro' => null];
+        }
+
+        $periodo = $this->periodoFromData($row['D'] ?? null);
+        if (!$periodo) {
+            $s = trim((string) ($row['D'] ?? ''));
+            if (preg_match('/^(\d{2})\/(\d{4})$/', $s, $m)) {
+                $periodo = $m[2] . '-' . $m[1];
+            }
+        }
+        if (!$periodo) {
+            return ['ok' => false, 'util' => true, 'erro' => 'Sem período (coluna D).'];
+        }
+
+        $contribuinte = null;
+        if ($cnpjEmpresa !== '') {
+            $contribuinte = $this->contribuintes->findByCnpjAndUser($cnpjEmpresa, $userId);
+        }
+        if (!$contribuinte) {
+            $contribuinte = $fallback;
+        }
+        if (!$contribuinte) {
+            return ['ok' => false, 'util' => true, 'erro' => 'Selecione o contribuinte.'];
+        }
+
+        $chave = $contribuinte['id'] . '|' . $periodo;
+        if (!isset($cacheComp[$chave])) {
+            $res = $this->competencias->findOrCreate((int) $contribuinte['id'], $periodo);
+            $cacheComp[$chave] = [
+                'id'     => (int) $res['competencia']['id'],
+                'criada' => (bool) $res['criada'],
+            ];
+        }
+        $ok = $this->importarR2055($row, $cacheComp[$chave]['id']);
+        if ($ok) {
+            if (!isset($resumo[$chave])) {
+                $resumo[$chave] = [
+                    'periodo'    => $periodo,
+                    'id'         => $cacheComp[$chave]['id'],
+                    'criada'     => $cacheComp[$chave]['criada'],
+                    'importados' => 0,
+                ];
+            }
+            $resumo[$chave]['importados']++;
+        }
+        return ['ok' => $ok, 'util' => true, 'erro' => null];
+    }
+
     public function processar(string $arquivo, string $evento, int $competenciaId, int $maxRows = 0): array
     {
         if ($evento === 'R2010') {
@@ -862,7 +1131,7 @@ class ImportacaoService
             return false;
         }
 
-        $codTipoServico = str_pad(trim((string) ($row['G'] ?? '')), 5, '0', STR_PAD_LEFT);
+        $codTipoServico = $this->extrairCodNaturezaR4020($row['G'] ?? '');
         $natRend        = $codTipoServico;
 
         $vlrBruto  = $this->parseMoeda($row['F'] ?? 0);
@@ -902,6 +1171,18 @@ class ImportacaoService
             'observacoes'               => (string) ($row['V'] ?? '') ?: null,
         ]);
         return true;
+    }
+
+    private function extrairCodNaturezaR4020(mixed $val): string
+    {
+        if (preg_match('/(\d{5})/', (string) $val, $m)) {
+            return $m[1];
+        }
+        $digits = preg_replace('/\D/', '', (string) $val) ?? '';
+        if ($digits !== '') {
+            return str_pad(substr($digits, -5), 5, '0', STR_PAD_LEFT);
+        }
+        return '17001';
     }
 
     private function parseMoeda(mixed $val): float

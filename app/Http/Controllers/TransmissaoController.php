@@ -114,38 +114,68 @@ class TransmissaoController extends Controller
             }
         }
 
-        $resultado = $temCertValido
-            ? $service->enviarLote($comp['cnpj'], $xmls, assinar: true)
-            : $service->enviarSimulado($comp['cnpj'], $xmls);
+        $arquivosList = array_values($arquivos);
+        $lotes        = array_chunk($arquivosList, 50);
+        $protocolos   = [];
+        $msgs         = [];
+        $algumOk      = false;
+        $ultimoErro   = '';
 
-        foreach ($arquivos as $arq) {
-            $this->logs->registrarEnvio($compId, $uid, $arq['evento'] ?? '—', $resultado);
-        }
+        foreach ($lotes as $i => $loteArquivos) {
+            $xmls = array_values(array_filter(array_map(static function ($a) {
+                $xml = $a['xml_conteudo'] ?: (file_exists($a['caminho'] ?? '') ? file_get_contents($a['caminho']) : '');
+                return is_string($xml) ? $xml : '';
+            }, $loteArquivos)));
 
-        if ($resultado['sucesso']) {
-            $protocolo = $resultado['protocolo'] ?? '';
-            $this->arquivos->marcarProtocolo(array_map(fn ($a) => (int) $a['id'], $arquivos), $protocolo);
-
-            if (!empty($resultado['simulado'])) {
-                // Simulação: NÃO marca competência como transmitido (evita falso compliance)
-                $msg = 'Simulação concluída (não oficial). Protocolo fictício: ' . ($protocolo ?: '—')
-                     . '. Cadastre um certificado válido para transmissão real.';
-                return $this->flashRedirect($url, $msg, 'sucesso');
+            if ($xmls === []) {
+                continue;
             }
 
-            // R-1000/R-1070/R-9000 sozinhos não marcam "transmitido";
-            // só quando todos os periódicos com dados forem enviados.
-            $eventosLote = array_values(array_map(
-                static fn ($a) => (string) ($a['evento'] ?? ''),
-                $arquivos
-            ));
-            $this->competencias->sincronizarStatusTransmissao($compId, $eventosLote, $protocolo);
+            $resultado = $temCertValido
+                ? $service->enviarLote($comp['cnpj'], $xmls, assinar: true)
+                : $service->enviarSimulado($comp['cnpj'], $xmls);
+
+            foreach ($loteArquivos as $arq) {
+                $this->logs->registrarEnvio($compId, $uid, $arq['evento'] ?? '—', $resultado);
+            }
+
+            $nLote = $i + 1;
+            $totalLotes = count($lotes);
+            if (!empty($resultado['sucesso'])) {
+                $algumOk = true;
+                $protocolo = (string) ($resultado['protocolo'] ?? '');
+                if ($protocolo !== '') {
+                    $protocolos[] = $protocolo;
+                    $this->arquivos->marcarProtocolo(
+                        array_map(static fn ($a) => (int) $a['id'], $loteArquivos),
+                        $protocolo
+                    );
+                }
+                if (!empty($resultado['simulado'])) {
+                    $msgs[] = "Lote {$nLote}/{$totalLotes}: simulação ({$protocolo})";
+                } else {
+                    $eventosLote = array_values(array_map(
+                        static fn ($a) => (string) ($a['evento'] ?? ''),
+                        $loteArquivos
+                    ));
+                    $this->competencias->sincronizarStatusTransmissao($compId, $eventosLote, $protocolo);
+                    $msgs[] = "Lote {$nLote}/{$totalLotes}: OK — protocolo {$protocolo}";
+                }
+            } else {
+                $ultimoErro = (string) ($resultado['desc_retorno'] ?? $resultado['erro'] ?? 'Falha');
+                $msgs[] = "Lote {$nLote}/{$totalLotes}: falha — {$ultimoErro}";
+            }
         }
 
-        $msg = ($resultado['sucesso'] ? 'Enviado com sucesso' : 'Falha')
-             . '. ' . ($resultado['desc_retorno'] ?? $resultado['erro'] ?? '')
-             . ' Protocolo: ' . ($resultado['protocolo'] ?? '—');
-        return $this->flashRedirect($url, trim($msg), $resultado['sucesso'] ? 'sucesso' : 'erro');
+        if ($msgs === []) {
+            return $this->flashRedirect($url, 'Nenhum XML válido para envio.', 'erro');
+        }
+
+        $msg = implode(' | ', $msgs);
+        if (count($protocolos) > 1) {
+            $msg .= ' | Consulte cada protocolo.';
+        }
+        return $this->flashRedirect($url, $msg, $algumOk ? 'sucesso' : 'erro');
     }
 
     public function consultar(Request $request)
