@@ -4,8 +4,10 @@
     /** @var string $acaoLabel */
     /** @var string $acaoIcon */
     /** @var string $titulo */
+    /** @var string $paramName query param for competência id */
     $grupos     = $grupos ?? [];
     $basePath   = $basePath ?? '/gerar';
+    $paramName  = $paramName ?? 'competencia_id';
     $acaoLabel  = $acaoLabel ?? 'Continuar';
     $acaoIcon   = $acaoIcon ?? 'bi-arrow-right';
     $titulo     = $titulo ?? 'Selecione o contribuinte e a competência';
@@ -52,7 +54,7 @@
                         <form method="GET" action="{{ $basePath }}" class="row g-2 align-items-end">
                             <div class="col-md-8">
                                 <label class="form-label">Competência (período)</label>
-                                <select name="competencia_id" class="form-select" required>
+                                <select name="{{ $paramName }}" class="form-select" required>
                                     <option value="">Selecione o período…</option>
                                     @foreach($g['competencias'] as $c)
                                     <option value="{{ (int) $c['id'] }}">

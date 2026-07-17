@@ -22,13 +22,10 @@ class CompetenciaController extends Controller
     public function index(Request $request)
     {
         $uid = $this->userId();
-        $cid = (int) $request->query('contribuinte_id', 0);
 
         return $this->render('pages.competencias.index', [
-            'pageTitle'      => 'Competências',
-            'competencias'   => $this->repo->listByUser($uid, $cid ?: null),
-            'contribuintes'  => $this->contribuintes->listByUser($uid),
-            'contribuinteId' => $cid,
+            'pageTitle'           => 'Competências',
+            'gruposContribuintes' => $this->repo->listGroupedByContribuinte($uid),
         ]);
     }
 
