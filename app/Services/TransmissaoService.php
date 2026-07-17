@@ -102,18 +102,45 @@ class TransmissaoService
         $recibosPorId = [];
         $body = $retorno['body'] ?? '';
 
+        // Recibo oficial: nrRecibo (legado) ou nrRecArqBase (retorno assíncrono atual)
         if (preg_match_all('/<nrRecibo>([^<]+)<\/nrRecibo>/', $body, $m)) {
-            $recibos = $m[1];
+            $recibos = array_merge($recibos, $m[1]);
+        }
+        if (preg_match_all('/<nrRecArqBase>([^<]+)<\/nrRecArqBase>/', $body, $mBase)) {
+            $recibos = array_values(array_unique(array_merge($recibos, $mBase[1])));
         }
 
-        // Associa Id do evento ao recibo (retorno REINF)
+        // Associa Id do evento ao recibo (retorno REINF — nrRecibo)
         if (preg_match_all(
-            '/(?:Id|id)=["\']?(ID[0-9A-Za-z]+)["\']?[\s\S]{0,800}?<nrRecibo>([^<]+)<\/nrRecibo>/',
+            '/(?:Id|id)=["\']?(ID[0-9A-Za-z]+)["\']?[\s\S]{0,1200}?<nrRecibo>([^<]+)<\/nrRecibo>/',
             $body,
             $pares,
             PREG_SET_ORDER
         )) {
             foreach ($pares as $par) {
+                $recibosPorId[$par[1]] = $par[2];
+            }
+        }
+
+        // Retorno atual (evtTotal): idEv + nrRecArqBase
+        if (preg_match_all(
+            '/<infoRecEv>[\s\S]*?<nrRecArqBase>([^<]+)<\/nrRecArqBase>[\s\S]*?<idEv>(ID[0-9A-Za-z]+)<\/idEv>[\s\S]*?<\/infoRecEv>/',
+            $body,
+            $paresBase,
+            PREG_SET_ORDER
+        )) {
+            foreach ($paresBase as $par) {
+                $recibosPorId[$par[2]] = $par[1];
+            }
+        }
+        // Ordem inversa das tags dentro de infoRecEv
+        if (preg_match_all(
+            '/<infoRecEv>[\s\S]*?<idEv>(ID[0-9A-Za-z]+)<\/idEv>[\s\S]*?<nrRecArqBase>([^<]+)<\/nrRecArqBase>[\s\S]*?<\/infoRecEv>/',
+            $body,
+            $paresBase2,
+            PREG_SET_ORDER
+        )) {
+            foreach ($paresBase2 as $par) {
                 $recibosPorId[$par[1]] = $par[2];
             }
         }
