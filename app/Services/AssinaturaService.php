@@ -3,7 +3,6 @@
 namespace App\Services;
 
 use App\Repositories\CertificadoRepository;
-use App\Repositories\Database;
 
 /**
  * Assina XML EFD-Reinf com certificado digital A1 (PFX/P12).
@@ -159,8 +158,7 @@ class AssinaturaService
         if (!$this->userId) {
             return null;
         }
-        $db   = Database::getInstance();
-        $repo = new CertificadoRepository($db);
+        $repo = new CertificadoRepository();
         $cert = null;
         if ($this->contribuinteId) {
             $cert = $repo->findAtivoByContribuinte($this->contribuinteId, $this->userId);

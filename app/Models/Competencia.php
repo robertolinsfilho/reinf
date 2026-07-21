@@ -35,4 +35,34 @@ class Competencia extends Model
     {
         return $this->hasMany(Transmissao::class, 'competencia_id');
     }
+
+    public function r2010(): HasMany
+    {
+        return $this->hasMany(R2010::class, 'competencia_id');
+    }
+
+    public function r2020(): HasMany
+    {
+        return $this->hasMany(R2020::class, 'competencia_id');
+    }
+
+    public function r2055(): HasMany
+    {
+        return $this->hasMany(R2055::class, 'competencia_id');
+    }
+
+    public function r2060(): HasMany
+    {
+        return $this->hasMany(R2060::class, 'competencia_id');
+    }
+
+    public function r4010(): HasMany
+    {
+        return $this->hasMany(R4010::class, 'competencia_id');
+    }
+
+    public function r4020(): HasMany
+    {
+        return $this->hasMany(R4020::class, 'competencia_id');
+    }
 }

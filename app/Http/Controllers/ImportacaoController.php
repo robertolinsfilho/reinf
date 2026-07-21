@@ -17,9 +17,9 @@ class ImportacaoController extends Controller
 
         return $this->render('pages.importacao.index', [
             'pageTitle'     => 'Importar Planilha Excel',
-            'competencias'  => (new CompetenciaRepository($this->db))->listByUser($uid),
-            'contribuintes' => (new ContribuinteRepository($this->db))->listByUser($uid),
-            'historico'     => (new ImportacaoLogRepository($this->db))->historicoByUser($uid),
+            'competencias'  => (new CompetenciaRepository())->listByUser($uid),
+            'contribuintes' => (new ContribuinteRepository())->listByUser($uid),
+            'historico'     => (new ImportacaoLogRepository())->historicoByUser($uid),
         ]);
     }
 
@@ -73,7 +73,7 @@ class ImportacaoController extends Controller
             if (!$compId) {
                 return response()->json(['ok' => false, 'erro' => 'Selecione a competência.'], 422);
             }
-            $comp = (new CompetenciaRepository($this->db))->findWithContribuinte($compId, $uid);
+            $comp = (new CompetenciaRepository())->findWithContribuinte($compId, $uid);
             if (!$comp) {
                 return response()->json(['ok' => false, 'erro' => 'Competência não encontrada.'], 422);
             }
@@ -88,7 +88,7 @@ class ImportacaoController extends Controller
 
         try {
             $uploaded->move($uploadDir, $nomeArquivo);
-            $job = new ImportacaoJobService(new ImportacaoService($this->db));
+            $job = new ImportacaoJobService(new ImportacaoService());
             $criado = $job->criar(
                 $destino,
                 $originalName,
@@ -121,11 +121,11 @@ class ImportacaoController extends Controller
         }
 
         try {
-            $job = new ImportacaoJobService(new ImportacaoService($this->db));
+            $job = new ImportacaoJobService(new ImportacaoService());
             $progress = $job->processarChunk($token, $uid, 250);
 
             if (!empty($progress['done'])) {
-                $logRepo = new ImportacaoLogRepository($this->db);
+                $logRepo = new ImportacaoLogRepository();
                 $comps = $progress['competencias'] ?? [];
                 if (($progress['modo'] ?? '') === 'auto' && $comps !== []) {
                     foreach ($comps as $c) {

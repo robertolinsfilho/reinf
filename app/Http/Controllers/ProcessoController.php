@@ -13,9 +13,8 @@ class ProcessoController extends Controller
 
     public function __construct()
     {
-        parent::__construct();
-        $this->repo          = new ProcessoRepository($this->db);
-        $this->contribuintes = new ContribuinteRepository($this->db);
+        $this->repo          = new ProcessoRepository();
+        $this->contribuintes = new ContribuinteRepository();
     }
 
     public function index()

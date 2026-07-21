@@ -17,9 +17,8 @@ class EventoController extends Controller
 
     public function __construct()
     {
-        parent::__construct();
-        $this->eventos      = new EventoRepository($this->db);
-        $this->competencias = new CompetenciaRepository($this->db);
+        $this->eventos      = new EventoRepository();
+        $this->competencias = new CompetenciaRepository();
     }
 
     public function index()
@@ -278,7 +277,7 @@ class EventoController extends Controller
 
     public function r4010(Request $request)
     {
-        $naturezas = (new NaturezaRendimentoRepository($this->db))->agrupadoPorTipo('pf');
+        $naturezas = (new NaturezaRendimentoRepository())->agrupadoPorTipo('pf');
         return $this->listarEvento(
             $request,
             'r4010',
@@ -326,7 +325,7 @@ class EventoController extends Controller
         $cid = (int) $request->query('competencia_id');
         $p   = $this->paginacao($request, $cid, 'r4020');
 
-        $naturezas = (new NaturezaRendimentoRepository($this->db))->agrupadoPorTipo('pj');
+        $naturezas = (new NaturezaRendimentoRepository())->agrupadoPorTipo('pj');
 
         $editId   = (int) $request->query('id');
         $editando = $editId ? $this->eventos->find('r4020', $editId, $cid) : null;

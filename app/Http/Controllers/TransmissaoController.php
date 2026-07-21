@@ -19,11 +19,10 @@ class TransmissaoController extends Controller
 
     public function __construct()
     {
-        parent::__construct();
-        $this->competencias = new CompetenciaRepository($this->db);
-        $this->arquivos     = new ArquivoGeradoRepository($this->db);
-        $this->logs         = new TransmissaoLogRepository($this->db);
-        $this->certificados = new CertificadoRepository($this->db);
+        $this->competencias = new CompetenciaRepository();
+        $this->arquivos     = new ArquivoGeradoRepository();
+        $this->logs         = new TransmissaoLogRepository();
+        $this->certificados = new CertificadoRepository();
     }
 
     public function index(Request $request)
@@ -95,7 +94,7 @@ class TransmissaoController extends Controller
             return $this->flashRedirect($url, 'Nenhum XML válido.', 'erro');
         }
 
-        $service = new TransmissaoService($this->db, $uid);
+        $service = new TransmissaoService($uid);
         $service->setContribuinteId((int) $comp['contribuinte_id']);
         $certAtivo     = $this->certificados->findAtivoByContribuinte((int) $comp['contribuinte_id'], $uid)
             ?: $this->certificados->findAtivoByUser($uid);
@@ -194,7 +193,7 @@ class TransmissaoController extends Controller
             return $this->flashRedirect('/transmissao', 'Competência não encontrada.', 'erro');
         }
 
-        $svc = new TransmissaoService($this->db, $uid);
+        $svc = new TransmissaoService($uid);
         $svc->setContribuinteId((int) $comp['contribuinte_id']);
         $resultado = $svc->consultarProtocolo($comp['cnpj'], $protocolo);
 
@@ -252,7 +251,7 @@ class TransmissaoController extends Controller
         }
 
         $arquivos  = $this->arquivos->findByIdsForUser($arquivoIds, $uid);
-        $geracao   = new GeracaoXmlService($this->db);
+        $geracao   = new GeracaoXmlService();
         $exclusoes = [];
 
         foreach ($arquivos as $a) {
@@ -307,7 +306,7 @@ class TransmissaoController extends Controller
             $xmls[]     = $arq['xml'];
         }
 
-        $service = new TransmissaoService($this->db, $uid);
+        $service = new TransmissaoService($uid);
         $service->setContribuinteId((int) $comp['contribuinte_id']);
         $resultado = $temCertValido
             ? $service->enviarLote($comp['cnpj'], $xmls, assinar: true)

@@ -2,19 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use App\Repositories\Database;
 
 abstract class Controller
 {
-    protected \PDO $db;
-
-    public function __construct()
-    {
-        $this->db = Database::getInstance();
-    }
-
     protected function render(string $template, array $data = [], bool $noLayout = false)
     {
         $user = auth()->user();
@@ -110,7 +103,7 @@ abstract class Controller
     {
         try {
             return $fn();
-        } catch (\PDOException $e) {
+        } catch (QueryException $e) {
             report($e);
             return $this->flashRedirect($redirectUrl, "{$errorPrefix}: falha ao gravar dados.", 'erro', $withInput);
         } catch (\RuntimeException $e) {

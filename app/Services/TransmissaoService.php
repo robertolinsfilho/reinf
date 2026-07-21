@@ -14,7 +14,7 @@ class TransmissaoService
     private AssinaturaService $assinatura;
     private ?int $contribuinteId = null;
 
-    public function __construct(private \PDO $db, private ?int $userId = null)
+    public function __construct(private ?int $userId = null)
     {
         $this->urlEnvio    = (array) config('reinf.ws_envio', []);
         $this->urlConsulta = (array) config('reinf.ws_consulta', []);
@@ -285,7 +285,7 @@ class TransmissaoService
      */
     private function extrairCertificadoTemporario(): ?array
     {
-        $repo      = new CertificadoRepository($this->db);
+        $repo      = new CertificadoRepository();
         $certAtivo = null;
         if ($this->userId) {
             if ($this->contribuinteId) {

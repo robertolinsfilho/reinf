@@ -11,8 +11,8 @@ class DashboardController extends Controller
     {
         $uid = $this->userId();
 
-        $contribuintes = new ContribuinteRepository($this->db);
-        $competencias  = new CompetenciaRepository($this->db);
+        $contribuintes = new ContribuinteRepository();
+        $competencias  = new CompetenciaRepository();
 
         return $this->render('pages.dashboard', [
             'pageTitle'          => 'Dashboard',

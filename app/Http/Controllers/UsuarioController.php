@@ -11,8 +11,7 @@ class UsuarioController extends Controller
 
     public function __construct()
     {
-        parent::__construct();
-        $this->repo = new UsuarioRepository($this->db);
+        $this->repo = new UsuarioRepository();
     }
 
     public function index()

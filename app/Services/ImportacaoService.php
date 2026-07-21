@@ -13,11 +13,11 @@ class ImportacaoService
     private ContribuinteRepository $contribuintes;
     private CompetenciaRepository $competencias;
 
-    public function __construct(\PDO $db)
+    public function __construct()
     {
-        $this->eventos       = new EventoRepository($db);
-        $this->contribuintes = new ContribuinteRepository($db);
-        $this->competencias  = new CompetenciaRepository($db);
+        $this->eventos       = new EventoRepository();
+        $this->contribuintes = new ContribuinteRepository();
+        $this->competencias  = new CompetenciaRepository();
     }
 
     /**

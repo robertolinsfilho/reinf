@@ -14,9 +14,8 @@ class CertificadoController extends Controller
 
     public function __construct()
     {
-        parent::__construct();
-        $this->repo          = new CertificadoRepository($this->db);
-        $this->contribuintes = new ContribuinteRepository($this->db);
+        $this->repo          = new CertificadoRepository();
+        $this->contribuintes = new ContribuinteRepository();
     }
 
     public function index()

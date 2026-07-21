@@ -20,7 +20,7 @@ class GeracaoXmlService
     private ArquivoGeradoRepository $arquivos;
     private ProcessoRepository $processos;
 
-    public function __construct(private \PDO $db)
+    public function __construct()
     {
         $this->outputDir = storage_path('xml') . '/';
         if (!is_dir($this->outputDir)) {
@@ -30,9 +30,9 @@ class GeracaoXmlService
         $this->tpAmb   = (int) config('reinf.tp_amb', 2);
         $this->verProc = (string) config('reinf.ver_proc', 'EFD-REINF-WEB-1.0');
         $this->procEmi = (int) config('reinf.proc_emi', 1);
-        $this->eventos   = new EventoRepository($db);
-        $this->arquivos  = new ArquivoGeradoRepository($db);
-        $this->processos = new ProcessoRepository($db);
+        $this->eventos   = new EventoRepository();
+        $this->arquivos  = new ArquivoGeradoRepository();
+        $this->processos = new ProcessoRepository();
     }
 
     public function gerar(array $competencia, array $eventos, int $indRetif = 1, ?string $nrRecibo = null): array

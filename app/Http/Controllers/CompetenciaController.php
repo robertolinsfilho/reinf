@@ -14,9 +14,8 @@ class CompetenciaController extends Controller
 
     public function __construct()
     {
-        parent::__construct();
-        $this->repo          = new CompetenciaRepository($this->db);
-        $this->contribuintes = new ContribuinteRepository($this->db);
+        $this->repo          = new CompetenciaRepository();
+        $this->contribuintes = new ContribuinteRepository();
     }
 
     public function index(Request $request)
@@ -48,7 +47,7 @@ class CompetenciaController extends Controller
 
         // Paginação: cada tab tem seu próprio "?page_r2010=", "?page_r4020=" etc.
         $limit      = 20;
-        $eventoRepo = new EventoRepository($this->db);
+        $eventoRepo = new EventoRepository();
         $eventos    = [];
 
         foreach (['r2010', 'r2020', 'r2055', 'r2060', 'r4010', 'r4020'] as $tab) {

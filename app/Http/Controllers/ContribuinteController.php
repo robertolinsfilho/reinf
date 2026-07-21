@@ -12,8 +12,7 @@ class ContribuinteController extends Controller
 
     public function __construct()
     {
-        parent::__construct();
-        $this->repo = new ContribuinteRepository($this->db);
+        $this->repo = new ContribuinteRepository();
     }
 
     public function index()

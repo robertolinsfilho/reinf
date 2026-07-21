@@ -19,10 +19,9 @@ class GeracaoController extends Controller
 
     public function __construct()
     {
-        parent::__construct();
-        $this->competencias = new CompetenciaRepository($this->db);
-        $this->eventos      = new EventoRepository($this->db);
-        $this->arquivos     = new ArquivoGeradoRepository($this->db);
+        $this->competencias = new CompetenciaRepository();
+        $this->eventos      = new EventoRepository();
+        $this->arquivos     = new ArquivoGeradoRepository();
     }
 
     public function index(Request $request)
@@ -107,7 +106,7 @@ class GeracaoController extends Controller
         }
 
         return $this->safeExecute(function () use ($comp, $compId, $selecionados, $assinar, $indRetif, $nrRecibo, $forcar, $url) {
-            $arquivos = (new GeracaoXmlService($this->db))->gerar($comp, $selecionados, $indRetif, $nrRecibo);
+            $arquivos = (new GeracaoXmlService())->gerar($comp, $selecionados, $indRetif, $nrRecibo);
 
             // Validar contra XSD
             $validador = new ValidacaoXmlService();
